@@ -36,6 +36,12 @@ namespace BackendSdk.Editor
         [SerializeField]
         private string developmentExternalId = string.Empty;
 
+        [SerializeField]
+        private int retryCount = 2;
+
+        [SerializeField]
+        private int retryDelayMilliseconds = 500;
+
         internal string ServerUrl
         {
             get => serverUrl;
@@ -84,6 +90,18 @@ namespace BackendSdk.Editor
             set => developmentExternalId = value ?? string.Empty;
         }
 
+        internal int RetryCount
+        {
+            get => retryCount;
+            set => retryCount = Mathf.Max(0, value);
+        }
+
+        internal int RetryDelayMilliseconds
+        {
+            get => retryDelayMilliseconds;
+            set => retryDelayMilliseconds = Mathf.Max(0, value);
+        }
+
         internal static BackendProjectSettings Load()
         {
             if (!File.Exists(ProjectSettingsPath))
@@ -113,7 +131,9 @@ namespace BackendSdk.Editor
                 ApiKey = ApiKey,
                 DevelopmentMode = DevelopmentMode,
                 DevelopmentProvider = DevelopmentProvider,
-                DevelopmentExternalId = DevelopmentExternalId
+                DevelopmentExternalId = DevelopmentExternalId,
+                RetryCount = RetryCount,
+                RetryDelayMilliseconds = RetryDelayMilliseconds
             };
         }
 

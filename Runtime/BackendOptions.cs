@@ -47,5 +47,15 @@ namespace BackendSdk
         /// The external identifier used when development-mode authentication is enabled.
         /// </summary>
         public string DevelopmentExternalId = string.Empty;
+
+        /// <summary>
+        /// How many automatic retries to perform after the first attempt for transient failures.
+        /// </summary>
+        public int RetryCount = 2;
+
+        /// <summary>
+        /// The fixed delay between retry attempts, in milliseconds.
+        /// </summary>
+        public int RetryDelayMilliseconds = 500;
     }
 }

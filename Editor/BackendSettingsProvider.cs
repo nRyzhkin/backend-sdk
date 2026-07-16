@@ -58,6 +58,28 @@ namespace BackendSdk.Editor
                     });
                     rootElement.Add(loggingField);
 
+                    var retryCountField = new IntegerField("Retry Count")
+                    {
+                        value = settings.RetryCount
+                    };
+                    retryCountField.RegisterValueChangedCallback(evt =>
+                    {
+                        settings.RetryCount = evt.newValue;
+                        settings.Save();
+                    });
+                    rootElement.Add(retryCountField);
+
+                    var retryDelayField = new IntegerField("Retry Delay (ms)")
+                    {
+                        value = settings.RetryDelayMilliseconds
+                    };
+                    retryDelayField.RegisterValueChangedCallback(evt =>
+                    {
+                        settings.RetryDelayMilliseconds = evt.newValue;
+                        settings.Save();
+                    });
+                    rootElement.Add(retryDelayField);
+
                     rootElement.Add(new HelpBox(
                         "Development mode allows Backend.Auth.LoginAsync() to authenticate using the credentials below while running in the Unity Editor.",
                         HelpBoxMessageType.Info));
@@ -105,6 +127,7 @@ namespace BackendSdk.Editor
                     "application",
                     "timeout",
                     "logging",
+                    "retry",
                     "development",
                     "provider",
                     "external id",

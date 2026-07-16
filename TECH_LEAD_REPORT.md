@@ -1,66 +1,86 @@
 # Technical Lead Report
 
-Unity main-thread fix for `UnityWebRequestTransport`.
+CancellationToken hardening in the transport layer.
 
-## Root Cause
-
-`UnityWebRequestTransport.SendAsync` awaited the request with:
-
-```csharp
-await request.SendWebRequestAsync(cancellationToken).ConfigureAwait(false);
-```
-
-`ConfigureAwait(false)` tells the runtime **not** to marshal the continuation back to the captured `SynchronizationContext`.
-
-In Unity, that context is the player-loop / main-thread context. After the await completed, execution resumed on a thread-pool thread. The next line accessed:
-
-```csharp
-request.downloadHandler?.text
-```
-
-Unity requires `DownloadHandler.text` (and most `UnityWebRequest` APIs) to be called from the main thread, which produced:
-
-```text
-UnityException: DownloadHandler.text can only be called from the Unity main thread.
-```
-
-## Why It Happened
-
-`ConfigureAwait(false)` is a common .NET server/library optimization. It is the wrong default for Unity code that touches engine APIs after an await.
-
-The previous await wrapper also completed a `TaskCompletionSource` from `AsyncOperation.completed`. That pattern can work on Unity **only if** callers capture the Unity synchronization context (`ConfigureAwait(true)` / omit `ConfigureAwait`). Combining TCS-style completion with `ConfigureAwait(false)` guaranteed off-thread resumption before Unity object access.
-
-## What Changed
-
-1. **`Runtime/Internal/UnityWebRequestTransport.cs`**
-   - Removed `ConfigureAwait(false)` from the transport await.
-   - After the await, `DownloadHandler.text` and related UnityWebRequest reads now run on the Unity main thread.
-
-2. **`Runtime/Internal/UnityWebRequestExtensions.cs`**
-   - Kept a `TaskCompletionSource` completion wrapper because `UnityWebRequestAsyncOperation` has no `GetAwaiter` in this package/Unity setup.
-   - Completion is signaled from `AsyncOperation.completed` (Unity player loop / main thread).
-   - Callers must await without `ConfigureAwait(false)` so continuations remain on Unity's synchronization context.
-   - No custom dispatcher, no `Task.Run`, no manual thread switching.
-
-Public SDK API was not changed.
-
-## Why The New Implementation Stays On The Unity Main Thread
-
-1. `UnityWebRequest.SendWebRequest()` completes via `AsyncOperation.completed` on the Unity player loop.
-2. That callback sets the `TaskCompletionSource`, so the Task completes from the main-thread completion path.
-3. The transport awaits that Task **without** `ConfigureAwait(false)`, preserving Unity's synchronization context.
-4. All `UnityWebRequest` / `DownloadHandler` access happens only after that await returns, therefore on the main thread.
-
-Note: a direct `await request.SendWebRequest()` was attempted, but `UnityWebRequestAsyncOperation` does not expose `GetAwaiter` in this package configuration (`CS1061`). The TCS + main-thread-safe await pattern is the compatible fix.
-
-## Files Modified
+## 1. Files Changed
 
 | File | Change |
 |------|--------|
-| `Runtime/Internal/UnityWebRequestTransport.cs` | Removed `ConfigureAwait(false)` before Unity API access |
-| `Runtime/Internal/UnityWebRequestExtensions.cs` | Await `SendWebRequest()` operation directly |
+| `Runtime/Internal/UnityWebRequestTransport.cs` | Explicit cancellation checks before each attempt and before retry; cancellation logging; ensure `OperationCanceledException` is never wrapped or retried |
 | `TECH_LEAD_REPORT.md` | This report |
 
-## Remaining Notes
+Unchanged:
 
-Service-layer `ConfigureAwait(false)` calls after `BackendClient` returns are currently safe because UnityWebRequest access is finished inside the transport before the Task completes. They were left unchanged to keep this fix focused. If future service code starts touching Unity APIs after awaits, those `ConfigureAwait(false)` usages should also be removed.
+- `BackendClient`
+- `AuthService`
+- `StorageService`
+- `LeaderboardsService`
+- Public SDK API
+- `UnityWebRequestExtensions` (already aborts the in-flight request and completes the Task as canceled)
+
+## 2. How Cancellation Works Now
+
+For every transport `SendAsync` call:
+
+1. **Before each attempt**  
+   `cancellationToken.ThrowIfCancellationRequested()` runs before creating/sending the HTTP request.
+
+2. **During the HTTP request**  
+   `SendWebRequestAsync` aborts `UnityWebRequest` when the token is canceled and completes the await with `OperationCanceledException` / `TaskCanceledException`.
+
+3. **After a transient failure, before retry**  
+   The transport checks the token again. If canceled, it does **not** log a retry and does **not** start another attempt.
+
+4. **During retry delay**  
+   `await Task.Delay(RetryDelayMilliseconds, cancellationToken)` is used. If canceled during the wait, `Task.Delay` throws `OperationCanceledException`, which is not caught for wrapping — only logged, then rethrown.
+
+5. **Logging**  
+   When `EnableLogging` is on, cancellation logs:
+
+   ```text
+   [Backend SDK] Request cancelled. PUT https://.../v1/storage/... RequestId=... Attempt=2
+   ```
+
+   RequestId is included only when present (mutating requests).
+
+## 3. Why OperationCanceledException Is Not Wrapped In BackendException
+
+Cancellation is a caller decision, not a backend failure.
+
+Wrapping it in `BackendException` would:
+
+- hide the cancellation signal from game code
+- risk treating it as `IsTransient == true`
+- trigger unwanted retries
+
+Therefore:
+
+- `SendOnceAsync` catches `OperationCanceledException` before the generic `Exception` handler and rethrows it unchanged
+- `SendAsync` catches it only to log (when enabled), then rethrows
+
+## 4. Why Retry Stops Correctly After Cancellation
+
+Retry only happens in:
+
+```csharp
+catch (BackendException exception) when (exception.IsTransient && attempt < maxAttempts)
+```
+
+`OperationCanceledException` is not a `BackendException`, so it never enters that branch.
+
+Additionally, before delay/next attempt the transport calls `ThrowIfCancellationRequested()`, and `Task.Delay(..., cancellationToken)` itself cancels. Both paths rethrow `OperationCanceledException` after optional logging, so no further HTTP attempt is made.
+
+## 5. Scenario Verification
+
+| Scenario | Expected behavior |
+|----------|-------------------|
+| Cancel before first attempt | `ThrowIfCancellationRequested` throws; log; no HTTP request; no retry |
+| Cancel during HTTP request | request aborted; OCE propagates; log; no retry |
+| Cancel during `Task.Delay` between retries | delay throws OCE; log; no next attempt |
+| Successful request without cancel | normal success path; no cancellation log |
+
+## 6. Public API Confirmation
+
+No public API changes.
+
+Game code still uses existing service methods and existing optional `CancellationToken` parameters. Callers continue to observe raw `OperationCanceledException` on cancel.

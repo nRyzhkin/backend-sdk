@@ -19,6 +19,8 @@ namespace BackendSdk
         /// <param name="developmentMode">Whether development-mode authentication is enabled.</param>
         /// <param name="developmentProvider">The provider used in development mode.</param>
         /// <param name="developmentExternalId">The external identifier used in development mode.</param>
+        /// <param name="retryCount">How many automatic retries to perform after the first attempt.</param>
+        /// <param name="retryDelayMilliseconds">The fixed delay between retry attempts, in milliseconds.</param>
         public BackendSettings(
             string serverUrl,
             string applicationId,
@@ -27,7 +29,9 @@ namespace BackendSdk
             string apiKey,
             bool developmentMode,
             string developmentProvider,
-            string developmentExternalId)
+            string developmentExternalId,
+            int retryCount = 2,
+            int retryDelayMilliseconds = 500)
         {
             ServerUrl = serverUrl ?? string.Empty;
             ApplicationId = applicationId ?? string.Empty;
@@ -37,6 +41,8 @@ namespace BackendSdk
             DevelopmentMode = developmentMode;
             DevelopmentProvider = developmentProvider ?? string.Empty;
             DevelopmentExternalId = developmentExternalId ?? string.Empty;
+            RetryCount = Math.Max(0, retryCount);
+            RetryDelayMilliseconds = Math.Max(0, retryDelayMilliseconds);
         }
 
         /// <summary>
@@ -79,6 +85,16 @@ namespace BackendSdk
         /// </summary>
         public string DevelopmentExternalId { get; }
 
+        /// <summary>
+        /// Gets how many automatic retries to perform after the first attempt for transient failures.
+        /// </summary>
+        public int RetryCount { get; }
+
+        /// <summary>
+        /// Gets the fixed delay between retry attempts, in milliseconds.
+        /// </summary>
+        public int RetryDelayMilliseconds { get; }
+
         internal BackendOptions ToOptions()
         {
             return new BackendOptions
@@ -90,7 +106,9 @@ namespace BackendSdk
                 ApiKey = ApiKey,
                 DevelopmentMode = DevelopmentMode,
                 DevelopmentProvider = DevelopmentProvider,
-                DevelopmentExternalId = DevelopmentExternalId
+                DevelopmentExternalId = DevelopmentExternalId,
+                RetryCount = RetryCount,
+                RetryDelayMilliseconds = RetryDelayMilliseconds
             };
         }
 
@@ -109,7 +127,9 @@ namespace BackendSdk
                 options.ApiKey,
                 options.DevelopmentMode,
                 options.DevelopmentProvider,
-                options.DevelopmentExternalId);
+                options.DevelopmentExternalId,
+                options.RetryCount,
+                options.RetryDelayMilliseconds);
         }
     }
 }

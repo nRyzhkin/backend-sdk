@@ -5,7 +5,7 @@
 Backend SDK is a game-facing API, not a REST wrapper.
 
 - Game code consumes high-level services.
-- HTTP, JSON, JWT, URLs, and ApplicationId stay inside the package.
+- HTTP, JSON, JWT, URLs, ApplicationId, RequestId, and Retry stay inside the package.
 - `Backend` is the public composition root.
 - `BackendClient` and `UnityWebRequestTransport` stay internal.
 
@@ -14,7 +14,7 @@ Backend SDK is a game-facing API, not a REST wrapper.
 1. Editor settings are saved to `ProjectSettings/BackendSdkSettings.json`.
 2. Settings are mirrored to `Assets/Resources/BackendSdkSettings.json`.
 3. `Backend.InitializeAsync()` loads that resource.
-4. Runtime caches Backend URL and Application ID in `Backend.Settings`.
+4. Runtime caches Backend URL, Application ID, and retry settings in `Backend.Settings`.
 5. Transport and `BackendClient` are created once.
 6. Service facades (`Auth`, `Storage`, `Leaderboards`, ...) reuse the shared client.
 
@@ -40,6 +40,20 @@ Backend SDK is a game-facing API, not a REST wrapper.
 - Leaderboard paths: `/v1/leaderboards/{applicationId}/{leaderboardName}`
 - Game APIs never accept ApplicationId arguments.
 
+## RequestId And Retry (Transport Layer)
+
+Owned exclusively by `UnityWebRequestTransport`:
+
+1. For `POST` / `PUT` / `DELETE`, generate `Guid.NewGuid().ToString("N")` once per logical call.
+2. Store it in internal `RequestContext`.
+3. Send header `X-Request-Id` on every attempt of that call.
+4. GET requests never receive a RequestId.
+5. On `BackendException` with `IsTransient == true`, retry up to `RetryCount` additional times.
+6. Retries reuse the same RequestId and use a constant `RetryDelayMilliseconds`.
+7. Retry exists only for the duration of one method call. No offline queue.
+
+Services never implement RequestId or Retry. Future modules (Analytics, Friends, Chat, Purchases) automatically inherit this behavior by calling `BackendClient`.
+
 ## Runtime Layers
 
 ### Public Facade
@@ -54,6 +68,7 @@ Backend SDK is a game-facing API, not a REST wrapper.
 - `BackendClient`
 - `IBackendTransport`
 - `UnityWebRequestTransport`
+- `RequestContext`
 - Wire-format DTOs for camelCase JSON
 - `UnityJsonSerializer`
 
@@ -69,11 +84,10 @@ Backend SDK is a game-facing API, not a REST wrapper.
 2. Keep wire DTOs internal.
 3. Route all networking through `BackendClient`.
 4. Return domain models, never transport objects.
-5. Keep ApplicationId and Authorization inside the SDK.
+5. Keep ApplicationId, Authorization, RequestId, and Retry inside the SDK.
 
 ## Remaining Work
 
 - Analytics, Friends, Remote Config, Inventory, Daily Rewards
-- Retry policies
-- RequestId
 - Token refresh
+- Offline / cross-session delivery (optional future layer on top of current transport retry)

@@ -12,6 +12,7 @@ namespace BackendSdk.Internal
         private const string ContentType = "application/json";
         private const string ApplicationIdHeader = "X-Application-Id";
         private const string AuthorizationHeader = "Authorization";
+        private const string RequestIdHeader = "X-Request-Id";
 
         private readonly BackendSettings settings;
 
@@ -27,7 +28,64 @@ namespace BackendSdk.Internal
             string authorizationHeader,
             CancellationToken cancellationToken)
         {
-            using var request = CreateRequest(verb, path, body, authorizationHeader);
+            var maxAttempts = 1 + settings.RetryCount;
+            var context = CreateRequestContext(verb);
+
+            BackendException lastTransientError = null;
+
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                context.Attempt = attempt;
+
+                try
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    return await SendOnceAsync<TRequest, TResponse>(
+                        verb,
+                        path,
+                        body,
+                        authorizationHeader,
+                        context,
+                        cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    LogCancelled(verb, path, context);
+                    throw;
+                }
+                catch (BackendException exception) when (exception.IsTransient && attempt < maxAttempts)
+                {
+                    lastTransientError = exception;
+
+                    try
+                    {
+                        // Do not start another retry if cancellation was requested after the failed attempt.
+                        cancellationToken.ThrowIfCancellationRequested();
+                        LogRetry(verb, path, context, maxAttempts);
+                        await DelayBeforeRetryAsync(cancellationToken);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        LogCancelled(verb, path, context);
+                        throw;
+                    }
+                }
+            }
+
+            throw lastTransientError
+                ?? new BackendException("Backend request failed after retries.", "request_failed", true);
+        }
+
+        private async Task<TResponse> SendOnceAsync<TRequest, TResponse>(
+            HttpVerb verb,
+            string path,
+            TRequest body,
+            string authorizationHeader,
+            RequestContext context,
+            CancellationToken cancellationToken)
+        {
+            using var request = CreateRequest(verb, path, body, authorizationHeader, context);
 
             try
             {
@@ -36,6 +94,7 @@ namespace BackendSdk.Internal
             }
             catch (OperationCanceledException)
             {
+                // Never wrap cancellation as BackendException and never treat it as transient.
                 throw;
             }
             catch (Exception exception)
@@ -52,7 +111,10 @@ namespace BackendSdk.Internal
 
             if (settings.EnableLogging)
             {
-                Debug.Log($"[Backend SDK] {verb} {request.url} -> {statusCode}");
+                var requestIdSuffix = string.IsNullOrEmpty(context.RequestId)
+                    ? string.Empty
+                    : $" RequestId={context.RequestId}";
+                Debug.Log($"[Backend SDK] {verb} {request.url} -> {statusCode}{requestIdSuffix}");
             }
 
             if (request.result == UnityWebRequest.Result.Success)
@@ -68,7 +130,12 @@ namespace BackendSdk.Internal
             throw CreateException(request, responseText, statusCode);
         }
 
-        private UnityWebRequest CreateRequest<TRequest>(HttpVerb verb, string path, TRequest body, string authorizationHeader)
+        private UnityWebRequest CreateRequest<TRequest>(
+            HttpVerb verb,
+            string path,
+            TRequest body,
+            string authorizationHeader,
+            RequestContext context)
         {
             var request = new UnityWebRequest(BuildUrl(path), MapMethod(verb))
             {
@@ -88,6 +155,11 @@ namespace BackendSdk.Internal
                 request.SetRequestHeader(AuthorizationHeader, authorizationHeader);
             }
 
+            if (!string.IsNullOrEmpty(context.RequestId))
+            {
+                request.SetRequestHeader(RequestIdHeader, context.RequestId);
+            }
+
             var payload = verb == HttpVerb.Get || verb == HttpVerb.Delete
                 ? string.Empty
                 : UnityJsonSerializer.Serialize(body);
@@ -99,6 +171,59 @@ namespace BackendSdk.Internal
             }
 
             return request;
+        }
+
+        private static RequestContext CreateRequestContext(HttpVerb verb)
+        {
+            if (verb == HttpVerb.Get)
+            {
+                return new RequestContext(null);
+            }
+
+            return new RequestContext(Guid.NewGuid().ToString("N"));
+        }
+
+        private async Task DelayBeforeRetryAsync(CancellationToken cancellationToken)
+        {
+            if (settings.RetryDelayMilliseconds <= 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return;
+            }
+
+            await Task.Delay(settings.RetryDelayMilliseconds, cancellationToken);
+        }
+
+        private void LogRetry(HttpVerb verb, string path, RequestContext context, int maxAttempts)
+        {
+            if (!settings.EnableLogging)
+            {
+                return;
+            }
+
+            var relativePath = string.IsNullOrWhiteSpace(path) ? "/" : "/" + path.TrimStart('/');
+            var requestIdSuffix = string.IsNullOrEmpty(context.RequestId)
+                ? string.Empty
+                : $" RequestId={context.RequestId}";
+
+            Debug.Log(
+                $"[Backend SDK] Retry {context.Attempt + 1}/{maxAttempts} {verb} {relativePath}{requestIdSuffix}");
+        }
+
+        private void LogCancelled(HttpVerb verb, string path, RequestContext context)
+        {
+            if (!settings.EnableLogging)
+            {
+                return;
+            }
+
+            var url = BuildUrl(path);
+            var requestIdSuffix = string.IsNullOrEmpty(context.RequestId)
+                ? string.Empty
+                : $" RequestId={context.RequestId}";
+
+            Debug.Log(
+                $"[Backend SDK] Request cancelled. {verb} {url}{requestIdSuffix} Attempt={context.Attempt}");
         }
 
         private string BuildUrl(string path)
@@ -133,10 +258,7 @@ namespace BackendSdk.Internal
 
         private static BackendException CreateException(UnityWebRequest request, string responseText, int statusCode)
         {
-            var isTransient = request.result == UnityWebRequest.Result.ConnectionError
-                || statusCode == 408
-                || statusCode == 429
-                || statusCode >= 500;
+            var isTransient = IsTransientFailure(request, statusCode);
 
             var serverError = ExtractServerError(responseText);
             var message = !string.IsNullOrWhiteSpace(serverError)
@@ -154,6 +276,28 @@ namespace BackendSdk.Internal
                 null,
                 statusCode > 0 ? statusCode : (int?)null,
                 serverError);
+        }
+
+        private static bool IsTransientFailure(UnityWebRequest request, int statusCode)
+        {
+            if (request.result == UnityWebRequest.Result.ConnectionError)
+            {
+                return true;
+            }
+
+            var error = request.error ?? string.Empty;
+            if (error.IndexOf("timeout", StringComparison.OrdinalIgnoreCase) >= 0
+                || error.IndexOf("timed out", StringComparison.OrdinalIgnoreCase) >= 0
+                || error.IndexOf("dns", StringComparison.OrdinalIgnoreCase) >= 0
+                || error.IndexOf("name resolution", StringComparison.OrdinalIgnoreCase) >= 0
+                || error.IndexOf("cannot resolve", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return true;
+            }
+
+            return statusCode == 408
+                || statusCode == 429
+                || statusCode >= 500;
         }
 
         private static string ExtractServerError(string responseText)

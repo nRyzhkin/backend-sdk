@@ -93,6 +93,28 @@ Configured Application ID is inserted into Storage and Leaderboards URLs automat
 
 Game code never passes ApplicationId.
 
+## RequestId And Retry
+
+Mutating requests (`POST`, `PUT`, `DELETE`) automatically receive an `X-Request-Id` header.
+
+GET requests do not.
+
+If a request fails with a transient error (`BackendException.IsTransient == true`), the transport retries it with the **same** RequestId.
+
+Defaults:
+
+- `RetryCount = 2` (first attempt + 2 retries)
+- `RetryDelayMilliseconds = 500` (constant delay)
+
+Retry lives only in `UnityWebRequestTransport`. Auth, Storage, and Leaderboards do not implement retry logic.
+
+Game code stays unchanged:
+
+```csharp
+await Backend.Storage.SetAsync("Save", save);
+await Backend.Leaderboards.SubmitAsync("highscore", 1500, SortMode.Descending);
+```
+
 ## Implemented Modules
 
 ### Auth
@@ -148,6 +170,8 @@ HTTP failures become `BackendException` with:
 - Application ID
 - Request Timeout
 - Enable Logging
+- Retry Count
+- Retry Delay (ms)
 - Development Mode
 - Development Provider
 - Development External ID
@@ -177,10 +201,9 @@ Samples~/
 - Remote Config
 - Inventory
 - Daily Rewards
-- Retry policies
-- RequestId correlation
 - Token refresh
 - Server-side logout
+- Offline queue / retry across app restarts (explicitly out of scope for current transport retry)
 
 ## Samples and Documentation
 
