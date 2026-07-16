@@ -42,7 +42,12 @@ namespace BackendSdk
                 return Data;
             }
 
-            throw Error ?? new InvalidOperationException("The request did not succeed.");
+            if (Error != null)
+            {
+                throw Error;
+            }
+
+            throw new InvalidOperationException("The request did not succeed.");
         }
 
         internal static RequestResult<T> Success(T data)
