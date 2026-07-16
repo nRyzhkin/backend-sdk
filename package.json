@@ -1,0 +1,17 @@
+{
+  "name": "com.backend.sdk",
+  "version": "0.1.0",
+  "displayName": "Backend SDK",
+  "description": "Lightweight Unity package for backend-facing game services.",
+  "unity": "6000.0",
+  "author": {
+    "name": "Backend SDK"
+  },
+  "keywords": [
+    "backend",
+    "sdk",
+    "services",
+    "networking",
+    "unity"
+  ]
+}

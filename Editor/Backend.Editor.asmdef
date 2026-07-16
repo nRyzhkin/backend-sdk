@@ -1,0 +1,18 @@
+{
+  "name": "Backend.Editor",
+  "rootNamespace": "BackendSdk.Editor",
+  "references": [
+    "Backend.Runtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
