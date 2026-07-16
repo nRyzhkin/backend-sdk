@@ -34,15 +34,72 @@ This package keeps transport concerns internal so future services such as authen
 - `BackendOptions`
 - `BackendSettings`
 - `BackendException`
+- `BackendNotImplementedException`
 - `RequestResult<T>`
+- Authentication:
+  - `IAuthService`
+  - `AuthService`
+  - `LoginRequest`
+  - `LoginResult`
+  - `PlayerSession`
+- Storage:
+  - `IStorageService`
+  - `StorageService`
 - Placeholder service facades:
-  - `Backend.Auth`
-  - `Backend.Storage`
   - `Backend.Leaderboards`
   - `Backend.Analytics`
   - `Backend.RemoteConfig`
   - `Backend.Friends`
   - `Backend.Inventory`
+
+## Authentication
+
+Authentication is provider-agnostic. The SDK only understands `Provider` and `ExternalId`; platform-specific SDKs remain in game code.
+
+```csharp
+await Backend.InitializeAsync();
+
+// Editor development flow
+var devLogin = await Backend.Auth.LoginAsync();
+
+// Explicit provider flow
+var login = await Backend.Auth.LoginAsync(new LoginRequest
+{
+    Provider = "crazygames",
+    ExternalId = crazyGamesUserId
+});
+
+var session = Backend.Auth.Session;
+var isAuthenticated = Backend.Auth.IsAuthenticated;
+
+await Backend.Auth.LogoutAsync();
+```
+
+`Backend.Auth.Session` is read-only. Game code can inspect the current session but cannot assign or modify it.
+
+The parameterless `LoginAsync()` overload is only available when development mode is enabled and the game is running in the Unity Editor. It uses the development credentials configured in Project Settings.
+
+Networking for authentication is not implemented yet. The public contract is established and methods throw `BackendNotImplementedException` once request validation completes.
+
+## Storage
+
+Storage is player-scoped key/value storage. Values are always scoped to the current authenticated player and application identifier. Game code must never pass a player identifier.
+
+The public method names are stable:
+
+- `SetAsync<T>()`
+- `GetAsync<T>()`
+- `DeleteAsync()`
+
+```csharp
+await Backend.Storage.SetAsync("Save", save);
+
+var save = await Backend.Storage.GetAsync<MySave>("Save");
+
+await Backend.Storage.DeleteAsync("Save");
+```
+
+Storage networking is not implemented yet. The public contract is established and methods throw `BackendNotImplementedException` after validation.
 
 ## Architecture
 
@@ -79,6 +136,15 @@ Backend SDK/
 |  |- BackendException.cs
 |  |- RequestResult.cs
 |  |- BackendPlaceholders.cs
+|  |- Auth/
+|  |  |- LoginRequest.cs
+|  |  |- LoginResult.cs
+|  |  |- PlayerSession.cs
+|  |  |- IAuthService.cs
+|  |  `- AuthService.cs
+|  |- Storage/
+|  |  |- IStorageService.cs
+|  |  `- StorageService.cs
 |  `- Internal/
 |     |- BackendClient.cs
 |     |- IBackendTransport.cs
@@ -101,13 +167,17 @@ The package adds a Project Settings page at `Project/Backend`.
 
 It stores:
 
-- Server URL
+- Backend URL
 - Application ID
-- Timeout
+- Request Timeout
 - Enable Logging
-- API Key (reserved for future use)
+- Development Mode
+- Development Provider
+- Development External ID
 
 When saved, the editor mirrors those values into a runtime JSON resource at `Assets/Resources/BackendSdkSettings.json`, which allows `Backend.InitializeAsync()` to work without manual plumbing.
+
+Development mode is intended for local Editor workflows. When enabled, `Backend.Auth.LoginAsync()` can authenticate using the configured development provider credentials without requiring game code to supply them.
 
 ## Adding Future Modules
 
@@ -119,11 +189,15 @@ Keep new modules consistent with the current shape:
 4. Return SDK-level models, `RequestResult<T>`, or domain-specific results rather than raw transport data.
 5. Only expose gameplay-meaningful methods on `Backend.<Service>`.
 
-Example direction for a future auth API:
+Example direction for authentication:
 
 ```csharp
 await Backend.InitializeAsync();
-var session = await Backend.Auth.SignInAnonymouslyAsync();
+var login = await Backend.Auth.LoginAsync(new LoginRequest
+{
+    Provider = "crazygames",
+    ExternalId = crazyGamesUserId
+});
 ```
 
 Not:
@@ -159,4 +233,16 @@ As new modules are added, request and response DTOs should be designed to work c
 
 ## Status
 
-This package currently provides the production-ready core scaffold only. Feature modules such as authentication and storage are intentionally left unimplemented so they can be added on top of a stable foundation.
+This package provides the core infrastructure plus public contracts for authentication and storage.
+
+Implemented:
+
+- SDK initialization and internal transport scaffold
+- Authentication public API and development-mode configuration
+- Storage public API contract
+
+Not yet implemented:
+
+- Authentication networking
+- Storage networking
+- Leaderboards, analytics, friends, remote config, inventory, and daily rewards

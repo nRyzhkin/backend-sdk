@@ -5,7 +5,7 @@ namespace BackendSdk
     /// <summary>
     /// Represents an SDK-level failure that can be surfaced to game code without exposing transport details.
     /// </summary>
-    public sealed class BackendException : Exception
+    public class BackendException : Exception
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="BackendException"/> class.

@@ -32,5 +32,20 @@ namespace BackendSdk
         /// The optional API key reserved for future use.
         /// </summary>
         public string ApiKey = string.Empty;
+
+        /// <summary>
+        /// Indicates whether development-mode authentication is enabled.
+        /// </summary>
+        public bool DevelopmentMode;
+
+        /// <summary>
+        /// The provider identifier used when development-mode authentication is enabled.
+        /// </summary>
+        public string DevelopmentProvider = string.Empty;
+
+        /// <summary>
+        /// The external identifier used when development-mode authentication is enabled.
+        /// </summary>
+        public string DevelopmentExternalId = string.Empty;
     }
 }

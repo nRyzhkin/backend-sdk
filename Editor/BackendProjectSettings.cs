@@ -27,6 +27,15 @@ namespace BackendSdk.Editor
         [SerializeField]
         private string apiKey = string.Empty;
 
+        [SerializeField]
+        private bool developmentMode;
+
+        [SerializeField]
+        private string developmentProvider = string.Empty;
+
+        [SerializeField]
+        private string developmentExternalId = string.Empty;
+
         internal string ServerUrl
         {
             get => serverUrl;
@@ -57,6 +66,24 @@ namespace BackendSdk.Editor
             set => apiKey = value ?? string.Empty;
         }
 
+        internal bool DevelopmentMode
+        {
+            get => developmentMode;
+            set => developmentMode = value;
+        }
+
+        internal string DevelopmentProvider
+        {
+            get => developmentProvider;
+            set => developmentProvider = value ?? string.Empty;
+        }
+
+        internal string DevelopmentExternalId
+        {
+            get => developmentExternalId;
+            set => developmentExternalId = value ?? string.Empty;
+        }
+
         internal static BackendProjectSettings Load()
         {
             if (!File.Exists(ProjectSettingsPath))
@@ -83,7 +110,10 @@ namespace BackendSdk.Editor
                 ApplicationId = ApplicationId,
                 TimeoutSeconds = TimeoutSeconds,
                 EnableLogging = EnableLogging,
-                ApiKey = ApiKey
+                ApiKey = ApiKey,
+                DevelopmentMode = DevelopmentMode,
+                DevelopmentProvider = DevelopmentProvider,
+                DevelopmentExternalId = DevelopmentExternalId
             };
         }
 

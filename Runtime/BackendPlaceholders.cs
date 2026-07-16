@@ -1,20 +1,6 @@
 namespace BackendSdk
 {
     /// <summary>
-    /// Entry point for future authentication features.
-    /// </summary>
-    public sealed partial class AuthService
-    {
-    }
-
-    /// <summary>
-    /// Entry point for future storage features.
-    /// </summary>
-    public sealed partial class StorageService
-    {
-    }
-
-    /// <summary>
     /// Entry point for future leaderboard features.
     /// </summary>
     public sealed partial class LeaderboardsService

@@ -24,7 +24,7 @@ namespace BackendSdk.Editor
                         "These settings are saved to Project Settings and mirrored to a runtime JSON resource used by Backend.InitializeAsync().",
                         HelpBoxMessageType.Info));
 
-                    rootElement.Add(CreateTextField("Server URL", settings.ServerUrl, value =>
+                    rootElement.Add(CreateTextField("Backend URL", settings.ServerUrl, value =>
                     {
                         settings.ServerUrl = value;
                         settings.Save();
@@ -36,7 +36,7 @@ namespace BackendSdk.Editor
                         settings.Save();
                     }));
 
-                    var timeoutField = new IntegerField("Timeout (seconds)")
+                    var timeoutField = new IntegerField("Request Timeout (seconds)")
                     {
                         value = settings.TimeoutSeconds
                     };
@@ -58,11 +58,44 @@ namespace BackendSdk.Editor
                     });
                     rootElement.Add(loggingField);
 
-                    rootElement.Add(CreateTextField("API Key (future)", settings.ApiKey, value =>
+                    rootElement.Add(new HelpBox(
+                        "Development mode allows Backend.Auth.LoginAsync() to authenticate using the credentials below while running in the Unity Editor.",
+                        HelpBoxMessageType.Info));
+
+                    var developmentProviderField = CreateTextField(
+                        "Development Provider",
+                        settings.DevelopmentProvider,
+                        value =>
+                        {
+                            settings.DevelopmentProvider = value;
+                            settings.Save();
+                        });
+                    developmentProviderField.SetEnabled(settings.DevelopmentMode);
+
+                    var developmentExternalIdField = CreateTextField(
+                        "Development External ID",
+                        settings.DevelopmentExternalId,
+                        value =>
+                        {
+                            settings.DevelopmentExternalId = value;
+                            settings.Save();
+                        });
+                    developmentExternalIdField.SetEnabled(settings.DevelopmentMode);
+
+                    var developmentModeField = new Toggle("Development Mode")
                     {
-                        settings.ApiKey = value;
+                        value = settings.DevelopmentMode
+                    };
+                    developmentModeField.RegisterValueChangedCallback(evt =>
+                    {
+                        settings.DevelopmentMode = evt.newValue;
+                        developmentProviderField.SetEnabled(evt.newValue);
+                        developmentExternalIdField.SetEnabled(evt.newValue);
                         settings.Save();
-                    }));
+                    });
+                    rootElement.Add(developmentModeField);
+                    rootElement.Add(developmentProviderField);
+                    rootElement.Add(developmentExternalIdField);
                 },
                 keywords = new System.Collections.Generic.HashSet<string>(new[]
                 {
@@ -72,7 +105,10 @@ namespace BackendSdk.Editor
                     "application",
                     "timeout",
                     "logging",
-                    "api key"
+                    "development",
+                    "provider",
+                    "external id",
+                    "authentication"
                 })
             };
         }
