@@ -1,6 +1,8 @@
 using System;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
+using BackendSdk.Internal;
 using UnityEngine;
 
 namespace BackendSdk
@@ -48,7 +50,7 @@ namespace BackendSdk
         }
 
         /// <inheritdoc />
-        public Task<LoginResult> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
+        public async Task<LoginResult> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
         {
             EnsureInitialized();
             cancellationToken.ThrowIfCancellationRequested();
@@ -68,7 +70,34 @@ namespace BackendSdk
                 throw new BackendException("Login external identifier is required.", "invalid_login_request");
             }
 
-            throw new BackendNotImplementedException("Authentication networking is not implemented yet.");
+            var client = Backend.ClientOrThrow();
+            var body = new LoginRequestDto
+            {
+                provider = request.Provider.Trim(),
+                externalId = request.ExternalId.Trim()
+            };
+
+            var response = await client.PostAsync<LoginRequestDto, LoginResponseDto>(
+                "v1/auth/login",
+                body,
+                cancellationToken).ConfigureAwait(false);
+
+            if (response == null || string.IsNullOrWhiteSpace(response.accessToken))
+            {
+                throw new BackendException("Login response did not include an access token.", "invalid_login_response");
+            }
+
+            var expiration = ParseExpiration(response.expiresAt);
+            var playerSession = new PlayerSession(
+                response.userId,
+                response.accessToken,
+                expiration,
+                body.provider,
+                body.externalId,
+                true);
+
+            SetSession(playerSession);
+            return new LoginResult(playerSession);
         }
 
         /// <inheritdoc />
@@ -76,7 +105,18 @@ namespace BackendSdk
         {
             EnsureInitialized();
             cancellationToken.ThrowIfCancellationRequested();
-            throw new BackendNotImplementedException("Authentication logout is not implemented yet.");
+            ClearSession();
+            return Task.CompletedTask;
+        }
+
+        internal string GetAuthorizationHeader()
+        {
+            if (session == null || string.IsNullOrWhiteSpace(session.AccessToken))
+            {
+                return null;
+            }
+
+            return "Bearer " + session.AccessToken;
         }
 
         internal void SetSession(PlayerSession value)
@@ -87,6 +127,22 @@ namespace BackendSdk
         internal void ClearSession()
         {
             session = null;
+        }
+
+        private static DateTime ParseExpiration(string expiresAt)
+        {
+            if (DateTime.TryParse(
+                    expiresAt,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.RoundtripKind,
+                    out var parsed))
+            {
+                return parsed.Kind == DateTimeKind.Unspecified
+                    ? DateTime.SpecifyKind(parsed, DateTimeKind.Utc)
+                    : parsed.ToUniversalTime();
+            }
+
+            return DateTime.UtcNow;
         }
 
         private static void EnsureInitialized()

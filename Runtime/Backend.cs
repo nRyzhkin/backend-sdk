@@ -89,6 +89,13 @@ namespace BackendSdk
                 var resolvedOptions = options ?? new BackendOptions();
                 Settings = BackendSettings.FromOptions(resolvedOptions);
 
+                if (string.IsNullOrWhiteSpace(Settings.ServerUrl))
+                {
+                    throw new BackendException(
+                        "Backend URL is not configured. Set it in Project Settings > Backend.",
+                        "missing_server_url");
+                }
+
                 var transport = new UnityWebRequestTransport(Settings);
                 client = new BackendClient(Settings, transport);
 

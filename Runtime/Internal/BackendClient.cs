@@ -21,44 +21,61 @@ namespace BackendSdk.Internal
             return Task.CompletedTask;
         }
 
-        internal Task<TResponse> GetAsync<TResponse>(string path, string authorizationToken = null, CancellationToken cancellationToken = default)
+        internal string ApplicationIdOrThrow()
+        {
+            if (string.IsNullOrWhiteSpace(Settings.ApplicationId))
+            {
+                throw new BackendException(
+                    "Application ID is not configured. Set it in Project Settings > Backend.",
+                    "missing_application_id");
+            }
+
+            return Settings.ApplicationId;
+        }
+
+        internal Task<TResponse> GetAsync<TResponse>(string path, CancellationToken cancellationToken = default)
         {
             return transport.SendAsync<object, TResponse>(
                 HttpVerb.Get,
                 path,
                 null,
-                authorizationToken,
+                ResolveAuthorizationHeader(),
                 cancellationToken);
         }
 
-        internal Task<TResponse> PostAsync<TRequest, TResponse>(string path, TRequest body, string authorizationToken = null, CancellationToken cancellationToken = default)
+        internal Task<TResponse> PostAsync<TRequest, TResponse>(string path, TRequest body, CancellationToken cancellationToken = default)
         {
             return transport.SendAsync<TRequest, TResponse>(
                 HttpVerb.Post,
                 path,
                 body,
-                authorizationToken,
+                ResolveAuthorizationHeader(),
                 cancellationToken);
         }
 
-        internal Task<TResponse> PutAsync<TRequest, TResponse>(string path, TRequest body, string authorizationToken = null, CancellationToken cancellationToken = default)
+        internal Task<TResponse> PutAsync<TRequest, TResponse>(string path, TRequest body, CancellationToken cancellationToken = default)
         {
             return transport.SendAsync<TRequest, TResponse>(
                 HttpVerb.Put,
                 path,
                 body,
-                authorizationToken,
+                ResolveAuthorizationHeader(),
                 cancellationToken);
         }
 
-        internal Task<TResponse> DeleteAsync<TResponse>(string path, string authorizationToken = null, CancellationToken cancellationToken = default)
+        internal Task DeleteAsync(string path, CancellationToken cancellationToken = default)
         {
-            return transport.SendAsync<object, TResponse>(
+            return transport.SendAsync<object, EmptyResponse>(
                 HttpVerb.Delete,
                 path,
                 null,
-                authorizationToken,
+                ResolveAuthorizationHeader(),
                 cancellationToken);
+        }
+
+        private static string ResolveAuthorizationHeader()
+        {
+            return Backend.Auth.GetAuthorizationHeader();
         }
     }
 }

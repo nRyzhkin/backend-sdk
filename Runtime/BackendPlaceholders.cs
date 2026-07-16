@@ -1,13 +1,6 @@
 namespace BackendSdk
 {
     /// <summary>
-    /// Entry point for future leaderboard features.
-    /// </summary>
-    public sealed partial class LeaderboardsService
-    {
-    }
-
-    /// <summary>
     /// Entry point for future analytics features.
     /// </summary>
     public sealed partial class AnalyticsService

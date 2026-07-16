@@ -1,8 +1,8 @@
 # Backend SDK
 
-Backend SDK is a lightweight Unity Package Manager package that provides a clean, high-level foundation for backend-powered game features.
+Backend SDK is a lightweight Unity Package Manager package that provides a game-facing API for backend-powered features.
 
-The package is intentionally designed so game code talks to services, not transport primitives. HTTP, serialization, request plumbing, and future retry policies stay inside the package.
+Game code talks to services. It never thinks about HTTP, JSON, JWT, URLs, or ApplicationId.
 
 ## Goals
 
@@ -16,17 +16,104 @@ The package is intentionally designed so game code talks to services, not transp
 
 ## Public API Philosophy
 
-Game code should depend on domain services:
-
 ```csharp
 using BackendSdk;
 
 await Backend.InitializeAsync();
+await Backend.Auth.LoginAsync();
+await Backend.Storage.SetAsync("Save", save);
+await Backend.Leaderboards.SubmitAsync("highscore", 1200, SortMode.Descending);
 ```
 
-It should not call low-level HTTP methods such as `Get`, `Post`, `Put`, or `Delete`.
+Not:
 
-This package keeps transport concerns internal so future services such as authentication, storage, leaderboards, analytics, friends, remote config, inventory, and daily rewards can evolve without leaking networking details into gameplay code.
+```csharp
+Backend.Post(...);
+Backend.Get(...);
+```
+
+## Quick Start
+
+1. Open `Project Settings > Backend`.
+2. Set Backend URL, Application ID, and optional development credentials.
+3. Initialize and use services:
+
+```csharp
+await Backend.InitializeAsync();
+
+// Editor development flow
+await Backend.Auth.LoginAsync();
+
+// Or explicit provider credentials from platform SDKs
+await Backend.Auth.LoginAsync(new LoginRequest
+{
+    Provider = "crazygames",
+    ExternalId = crazyGamesUserId
+});
+
+await Backend.Storage.SetAsync("Save", save);
+var save = await Backend.Storage.GetAsync<MySave>("Save");
+
+await Backend.Leaderboards.SubmitAsync("highscore", 1500, SortMode.Descending);
+var top = await Backend.Leaderboards.GetTopAsync("highscore", limit: 50);
+var around = await Backend.Leaderboards.GetAroundPlayerAsync("highscore", range: 5);
+```
+
+## Initialization Flow
+
+`Backend.InitializeAsync()`:
+
+1. Loads Project Settings from the runtime JSON resource.
+2. Caches Backend URL and Application ID in `Backend.Settings`.
+3. Creates the internal transport and `BackendClient`.
+4. Makes service facades ready for use.
+5. Runs only once.
+
+## Authentication Flow
+
+1. Game calls `Backend.Auth.LoginAsync()` or `LoginAsync(LoginRequest)`.
+2. SDK posts credentials to the backend.
+3. `AuthService` stores `PlayerSession` with access token and expiration.
+4. Later requests automatically include `Authorization: Bearer <AccessToken>`.
+5. Game code never passes tokens.
+
+`Backend.Auth.Session` is read-only. Only the SDK can create or clear the session.
+
+`LogoutAsync()` clears the local session.
+
+## Automatic Token Injection
+
+`BackendClient` asks `AuthService` for the current authorization header on every request.
+
+Services such as Storage and Leaderboards never assemble tokens themselves.
+
+## Automatic ApplicationId Usage
+
+Configured Application ID is inserted into Storage and Leaderboards URLs automatically.
+
+Game code never passes ApplicationId.
+
+## Implemented Modules
+
+### Auth
+
+- `LoginAsync()`
+- `LoginAsync(LoginRequest)`
+- `LogoutAsync()`
+- `Session`
+- `IsAuthenticated`
+
+### Storage
+
+- `SetAsync<T>(key, value)`
+- `GetAsync<T>(key)`
+- `DeleteAsync(key)`
+
+### Leaderboards
+
+- `SubmitAsync(leaderboardName, value, sortMode)`
+- `GetTopAsync(leaderboardName, limit = 100)`
+- `GetAroundPlayerAsync(leaderboardName, range = 5)`
 
 ## Current Public Surface
 
@@ -36,136 +123,26 @@ This package keeps transport concerns internal so future services such as authen
 - `BackendException`
 - `BackendNotImplementedException`
 - `RequestResult<T>`
-- Authentication:
-  - `IAuthService`
-  - `AuthService`
-  - `LoginRequest`
-  - `LoginResult`
-  - `PlayerSession`
-- Storage:
-  - `IStorageService`
-  - `StorageService`
-- Placeholder service facades:
-  - `Backend.Leaderboards`
-  - `Backend.Analytics`
-  - `Backend.RemoteConfig`
-  - `Backend.Friends`
-  - `Backend.Inventory`
+- Authentication: `IAuthService`, `AuthService`, `LoginRequest`, `LoginResult`, `PlayerSession`
+- Storage: `IStorageService`, `StorageService`
+- Leaderboards: `ILeaderboardsService`, `LeaderboardsService`, `SortMode`, `LeaderboardEntry`, `LeaderboardSubmitResult`, `LeaderboardAroundResult`
+- Placeholder facades: Analytics, RemoteConfig, Friends, Inventory
 
-## Authentication
+## Error Handling
 
-Authentication is provider-agnostic. The SDK only understands `Provider` and `ExternalId`; platform-specific SDKs remain in game code.
+HTTP failures become `BackendException` with:
 
-```csharp
-await Backend.InitializeAsync();
+- `Message`
+- `StatusCode`
+- `ServerError`
+- `ErrorCode`
+- `IsTransient`
 
-// Editor development flow
-var devLogin = await Backend.Auth.LoginAsync();
-
-// Explicit provider flow
-var login = await Backend.Auth.LoginAsync(new LoginRequest
-{
-    Provider = "crazygames",
-    ExternalId = crazyGamesUserId
-});
-
-var session = Backend.Auth.Session;
-var isAuthenticated = Backend.Auth.IsAuthenticated;
-
-await Backend.Auth.LogoutAsync();
-```
-
-`Backend.Auth.Session` is read-only. Game code can inspect the current session but cannot assign or modify it.
-
-The parameterless `LoginAsync()` overload is only available when development mode is enabled and the game is running in the Unity Editor. It uses the development credentials configured in Project Settings.
-
-Networking for authentication is not implemented yet. The public contract is established and methods throw `BackendNotImplementedException` once request validation completes.
-
-## Storage
-
-Storage is player-scoped key/value storage. Values are always scoped to the current authenticated player and application identifier. Game code must never pass a player identifier.
-
-The public method names are stable:
-
-- `SetAsync<T>()`
-- `GetAsync<T>()`
-- `DeleteAsync()`
-
-```csharp
-await Backend.Storage.SetAsync("Save", save);
-
-var save = await Backend.Storage.GetAsync<MySave>("Save");
-
-await Backend.Storage.DeleteAsync("Save");
-```
-
-Storage networking is not implemented yet. The public contract is established and methods throw `BackendNotImplementedException` after validation.
-
-## Architecture
-
-The package is split into a small public facade and an internal infrastructure layer.
-
-### Public Layer
-
-- `Backend` is the only runtime entry point.
-- Service placeholders are stable facade types intended to grow over time.
-- Public result and exception types expose SDK-level outcomes, not HTTP status codes or raw `UnityWebRequest` objects.
-
-### Internal Layer
-
-- `BackendClient` coordinates SDK infrastructure and future modules.
-- `IBackendTransport` defines the internal request contract.
-- `UnityWebRequestTransport` owns request construction, headers, serialization, timeout, cancellation, and response handling.
-- `RuntimeSettingsLoader` loads runtime configuration generated from the Project Settings page.
-
-This makes future retry support straightforward: add a transport decorator or policy layer around `IBackendTransport` without changing the public API.
-
-## Folder Structure
-
-```text
-Backend SDK/
-|- package.json
-|- README.md
-|- CHANGELOG.md
-|- LICENSE.md
-|- Runtime/
-|  |- Backend.Runtime.asmdef
-|  |- Backend.cs
-|  |- BackendOptions.cs
-|  |- BackendSettings.cs
-|  |- BackendException.cs
-|  |- RequestResult.cs
-|  |- BackendPlaceholders.cs
-|  |- Auth/
-|  |  |- LoginRequest.cs
-|  |  |- LoginResult.cs
-|  |  |- PlayerSession.cs
-|  |  |- IAuthService.cs
-|  |  `- AuthService.cs
-|  |- Storage/
-|  |  |- IStorageService.cs
-|  |  `- StorageService.cs
-|  `- Internal/
-|     |- BackendClient.cs
-|     |- IBackendTransport.cs
-|     |- HttpVerb.cs
-|     |- RuntimeSettingsLoader.cs
-|     |- UnityJsonSerializer.cs
-|     |- UnityWebRequestExtensions.cs
-|     `- UnityWebRequestTransport.cs
-|- Editor/
-|  |- Backend.Editor.asmdef
-|  |- BackendProjectSettings.cs
-|  `- BackendSettingsProvider.cs
-|- Documentation~/
-`- Samples~/
-```
+`UnityWebRequest` is never exposed to game code.
 
 ## Project Settings
 
-The package adds a Project Settings page at `Project/Backend`.
-
-It stores:
+`Project Settings > Backend` stores:
 
 - Backend URL
 - Application ID
@@ -175,74 +152,38 @@ It stores:
 - Development Provider
 - Development External ID
 
-When saved, the editor mirrors those values into a runtime JSON resource at `Assets/Resources/BackendSdkSettings.json`, which allows `Backend.InitializeAsync()` to work without manual plumbing.
+Development mode allows parameterless `Backend.Auth.LoginAsync()` in the Unity Editor.
 
-Development mode is intended for local Editor workflows. When enabled, `Backend.Auth.LoginAsync()` can authenticate using the configured development provider credentials without requiring game code to supply them.
+## Folder Structure
 
-## Adding Future Modules
-
-Keep new modules consistent with the current shape:
-
-1. Add a public facade type in `Runtime/` if the module needs a user-facing entry point.
-2. Add internal request/response DTOs and service implementation code under `Runtime/Internal/Modules/<ModuleName>/` or a similarly focused folder.
-3. Route backend communication through `BackendClient` and `IBackendTransport`.
-4. Return SDK-level models, `RequestResult<T>`, or domain-specific results rather than raw transport data.
-5. Only expose gameplay-meaningful methods on `Backend.<Service>`.
-
-Example direction for authentication:
-
-```csharp
-await Backend.InitializeAsync();
-var login = await Backend.Auth.LoginAsync(new LoginRequest
-{
-    Provider = "crazygames",
-    ExternalId = crazyGamesUserId
-});
+```text
+Runtime/
+|- Auth/
+|- Storage/
+|- Leaderboards/
+|- Internal/
+|- Backend.cs
+|- BackendException.cs
+|- ...
+Editor/
+Documentation~/
+Samples~/
 ```
 
-Not:
+## Remaining TODOs
 
-```csharp
-await Backend.Post<AuthRequest, AuthResponse>("auth/anonymous", request);
-```
-
-## Coding Conventions
-
-- Prefer small, explicit classes over generic abstractions.
-- Keep transport code internal.
-- Use async/await instead of callbacks.
-- Pass `CancellationToken` through all infrastructure and service operations.
-- Favor immutable runtime settings and mutable initialization options.
-- Use XML documentation on public types.
-- Avoid reflection, service locators, and DI frameworks.
-
-## Serialization Notes
-
-The initial implementation uses Unity's built-in `JsonUtility` to avoid third-party dependencies and keep AOT behavior predictable.
-
-As new modules are added, request and response DTOs should be designed to work cleanly with `JsonUtility`:
-
-- Mark DTOs with `[System.Serializable]`
-- Prefer fields or simple properties that Unity serialization supports
-- Avoid complex polymorphic payloads in the core package
+- Analytics
+- Friends
+- Remote Config
+- Inventory
+- Daily Rewards
+- Retry policies
+- RequestId correlation
+- Token refresh
+- Server-side logout
 
 ## Samples and Documentation
 
-- `Documentation~/Architecture.md` describes the package structure and extension strategy.
-- `Samples~/GettingStarted/README.md` shows the intended initialization flow.
-
-## Status
-
-This package provides the core infrastructure plus public contracts for authentication and storage.
-
-Implemented:
-
-- SDK initialization and internal transport scaffold
-- Authentication public API and development-mode configuration
-- Storage public API contract
-
-Not yet implemented:
-
-- Authentication networking
-- Storage networking
-- Leaderboards, analytics, friends, remote config, inventory, and daily rewards
+- `Documentation~/Architecture.md`
+- `Samples~/GettingStarted/README.md`
+- `TECH_LEAD_REPORT.md`

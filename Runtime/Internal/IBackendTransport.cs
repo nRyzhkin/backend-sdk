@@ -9,7 +9,7 @@ namespace BackendSdk.Internal
             HttpVerb verb,
             string path,
             TRequest body,
-            string authorizationToken,
+            string authorizationHeader,
             CancellationToken cancellationToken);
     }
 }

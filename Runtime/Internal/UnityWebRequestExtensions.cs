@@ -6,25 +6,21 @@ namespace BackendSdk.Internal
 {
     internal static class UnityWebRequestExtensions
     {
+        /// <summary>
+        /// Completes when the UnityWebRequest finishes on the player loop.
+        /// Callers must await without ConfigureAwait(false) so Unity API access stays on the main thread.
+        /// </summary>
         internal static Task SendWebRequestAsync(this UnityWebRequest request, CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             var tcs = new TaskCompletionSource<bool>();
             var operation = request.SendWebRequest();
 
-            operation.completed += _ =>
-            {
-                if (request.result == UnityWebRequest.Result.ConnectionError && cancellationToken.IsCancellationRequested)
-                {
-                    tcs.TrySetCanceled(cancellationToken);
-                    return;
-                }
-
-                tcs.TrySetResult(true);
-            };
-
+            CancellationTokenRegistration registration = default;
             if (cancellationToken.CanBeCanceled)
             {
-                cancellationToken.Register(() =>
+                registration = cancellationToken.Register(() =>
                 {
                     try
                     {
@@ -36,6 +32,19 @@ namespace BackendSdk.Internal
                     }
                 });
             }
+
+            operation.completed += _ =>
+            {
+                registration.Dispose();
+
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    tcs.TrySetCanceled(cancellationToken);
+                    return;
+                }
+
+                tcs.TrySetResult(true);
+            };
 
             return tcs.Task;
         }

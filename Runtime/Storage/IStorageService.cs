@@ -8,6 +8,7 @@ namespace BackendSdk
     /// </summary>
     /// <remarks>
     /// The public method names <c>SetAsync</c>, <c>GetAsync</c>, and <c>DeleteAsync</c> are stable SDK API.
+    /// Storage is scoped to the authenticated player and configured Application ID automatically.
     /// </remarks>
     public interface IStorageService
     {

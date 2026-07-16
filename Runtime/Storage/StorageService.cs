@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using BackendSdk.Internal;
 
 namespace BackendSdk
 {
@@ -9,35 +10,101 @@ namespace BackendSdk
     /// </summary>
     /// <remarks>
     /// Storage is scoped to the current authenticated player and application identifier.
-    /// Game code must not pass player identifiers to these methods.
+    /// Game code must not pass player identifiers or application identifiers to these methods.
     /// </remarks>
     public sealed class StorageService : IStorageService
     {
         /// <inheritdoc />
-        public Task SetAsync<T>(string key, T value, CancellationToken cancellationToken = default)
+        public async Task SetAsync<T>(string key, T value, CancellationToken cancellationToken = default)
         {
-            EnsureInitialized();
+            var client = GetAuthenticatedClient();
             cancellationToken.ThrowIfCancellationRequested();
             ValidateKey(key);
-            throw new BackendNotImplementedException("Storage networking is not implemented yet.");
+
+            var body = new StorageValueDto
+            {
+                value = SerializeValue(value)
+            };
+
+            await client.PutAsync<StorageValueDto, StorageValueDto>(
+                BuildPath(client, key),
+                body,
+                cancellationToken).ConfigureAwait(false);
         }
 
         /// <inheritdoc />
-        public Task<T> GetAsync<T>(string key, CancellationToken cancellationToken = default)
+        public async Task<T> GetAsync<T>(string key, CancellationToken cancellationToken = default)
         {
-            EnsureInitialized();
+            var client = GetAuthenticatedClient();
             cancellationToken.ThrowIfCancellationRequested();
             ValidateKey(key);
-            throw new BackendNotImplementedException("Storage networking is not implemented yet.");
+
+            var response = await client.GetAsync<StorageValueDto>(
+                BuildPath(client, key),
+                cancellationToken).ConfigureAwait(false);
+
+            return DeserializeValue<T>(response?.value);
         }
 
         /// <inheritdoc />
-        public Task DeleteAsync(string key, CancellationToken cancellationToken = default)
+        public async Task DeleteAsync(string key, CancellationToken cancellationToken = default)
         {
-            EnsureInitialized();
+            var client = GetAuthenticatedClient();
             cancellationToken.ThrowIfCancellationRequested();
             ValidateKey(key);
-            throw new BackendNotImplementedException("Storage networking is not implemented yet.");
+
+            await client.DeleteAsync(BuildPath(client, key), cancellationToken).ConfigureAwait(false);
+        }
+
+        private static BackendClient GetAuthenticatedClient()
+        {
+            EnsureInitialized();
+
+            if (!Backend.Auth.IsAuthenticated)
+            {
+                throw new BackendException(
+                    "Storage requires an authenticated player. Call Backend.Auth.LoginAsync first.",
+                    "not_authenticated");
+            }
+
+            return Backend.ClientOrThrow();
+        }
+
+        private static string BuildPath(BackendClient client, string key)
+        {
+            var applicationId = Uri.EscapeDataString(client.ApplicationIdOrThrow());
+            var escapedKey = Uri.EscapeDataString(key);
+            return $"v1/storage/{applicationId}/{escapedKey}";
+        }
+
+        private static string SerializeValue<T>(T value)
+        {
+            if (value == null)
+            {
+                return string.Empty;
+            }
+
+            if (value is string stringValue)
+            {
+                return stringValue;
+            }
+
+            return UnityJsonSerializer.Serialize(value);
+        }
+
+        private static T DeserializeValue<T>(string raw)
+        {
+            if (typeof(T) == typeof(string))
+            {
+                return (T)(object)(raw ?? string.Empty);
+            }
+
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return default;
+            }
+
+            return UnityJsonSerializer.Deserialize<T>(raw);
         }
 
         private static void EnsureInitialized()

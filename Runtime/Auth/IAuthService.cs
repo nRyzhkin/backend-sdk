@@ -40,7 +40,7 @@ namespace BackendSdk
         Task<LoginResult> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Logs out the current player and clears the active session.
+        /// Logs out the current player and clears the active local session.
         /// </summary>
         /// <param name="cancellationToken">A cancellation token for the logout operation.</param>
         /// <returns>A task that completes when logout finishes.</returns>

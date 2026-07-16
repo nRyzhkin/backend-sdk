@@ -24,14 +24,15 @@ namespace BackendSdk.Internal
             HttpVerb verb,
             string path,
             TRequest body,
-            string authorizationToken,
+            string authorizationHeader,
             CancellationToken cancellationToken)
         {
-            using var request = CreateRequest(verb, path, body, authorizationToken);
+            using var request = CreateRequest(verb, path, body, authorizationHeader);
 
             try
             {
-                await request.SendWebRequestAsync(cancellationToken).ConfigureAwait(false);
+                // Must resume on the Unity main thread before touching DownloadHandler / UnityWebRequest APIs.
+                await request.SendWebRequestAsync(cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -39,25 +40,35 @@ namespace BackendSdk.Internal
             }
             catch (Exception exception)
             {
-                throw new BackendException("Backend request failed before a response was received.", "transport_failure", true, exception);
+                throw new BackendException(
+                    "Backend request failed before a response was received.",
+                    "transport_failure",
+                    true,
+                    exception);
             }
 
             var responseText = request.downloadHandler?.text ?? string.Empty;
+            var statusCode = (int)request.responseCode;
 
             if (settings.EnableLogging)
             {
-                Debug.Log($"[Backend SDK] {verb} {request.url}");
+                Debug.Log($"[Backend SDK] {verb} {request.url} -> {statusCode}");
             }
 
             if (request.result == UnityWebRequest.Result.Success)
             {
+                if (string.IsNullOrWhiteSpace(responseText))
+                {
+                    return default;
+                }
+
                 return UnityJsonSerializer.Deserialize<TResponse>(responseText);
             }
 
-            throw CreateException(request, responseText);
+            throw CreateException(request, responseText, statusCode);
         }
 
-        private UnityWebRequest CreateRequest<TRequest>(HttpVerb verb, string path, TRequest body, string authorizationToken)
+        private UnityWebRequest CreateRequest<TRequest>(HttpVerb verb, string path, TRequest body, string authorizationHeader)
         {
             var request = new UnityWebRequest(BuildUrl(path), MapMethod(verb))
             {
@@ -72,9 +83,9 @@ namespace BackendSdk.Internal
                 request.SetRequestHeader(ApplicationIdHeader, settings.ApplicationId);
             }
 
-            if (!string.IsNullOrWhiteSpace(authorizationToken))
+            if (!string.IsNullOrWhiteSpace(authorizationHeader))
             {
-                request.SetRequestHeader(AuthorizationHeader, authorizationToken);
+                request.SetRequestHeader(AuthorizationHeader, authorizationHeader);
             }
 
             var payload = verb == HttpVerb.Get || verb == HttpVerb.Delete
@@ -120,19 +131,81 @@ namespace BackendSdk.Internal
             };
         }
 
-        private static BackendException CreateException(UnityWebRequest request, string responseText)
+        private static BackendException CreateException(UnityWebRequest request, string responseText, int statusCode)
         {
-            var isTransient = request.result == UnityWebRequest.Result.ConnectionError;
-            var message = string.IsNullOrWhiteSpace(responseText)
-                ? request.error
-                : responseText;
+            var isTransient = request.result == UnityWebRequest.Result.ConnectionError
+                || statusCode == 408
+                || statusCode == 429
+                || statusCode >= 500;
 
-            if (string.IsNullOrWhiteSpace(message))
+            var serverError = ExtractServerError(responseText);
+            var message = !string.IsNullOrWhiteSpace(serverError)
+                ? serverError
+                : !string.IsNullOrWhiteSpace(responseText)
+                    ? responseText
+                    : !string.IsNullOrWhiteSpace(request.error)
+                        ? request.error
+                        : "Backend request failed.";
+
+            return new BackendException(
+                message,
+                "request_failed",
+                isTransient,
+                null,
+                statusCode > 0 ? statusCode : (int?)null,
+                serverError);
+        }
+
+        private static string ExtractServerError(string responseText)
+        {
+            if (string.IsNullOrWhiteSpace(responseText))
             {
-                message = "Backend request failed.";
+                return string.Empty;
             }
 
-            return new BackendException(message, "request_failed", isTransient);
+            try
+            {
+                var body = UnityJsonSerializer.Deserialize<ServerErrorBody>(responseText);
+                if (body == null)
+                {
+                    return string.Empty;
+                }
+
+                if (!string.IsNullOrWhiteSpace(body.error))
+                {
+                    return body.error;
+                }
+
+                if (!string.IsNullOrWhiteSpace(body.title))
+                {
+                    return body.title;
+                }
+
+                if (!string.IsNullOrWhiteSpace(body.detail))
+                {
+                    return body.detail;
+                }
+
+                if (!string.IsNullOrWhiteSpace(body.message))
+                {
+                    return body.message;
+                }
+            }
+            catch
+            {
+                // Fall through and leave ServerError empty when the payload is not JSON.
+            }
+
+            return string.Empty;
+        }
+
+        [Serializable]
+        private sealed class ServerErrorBody
+        {
+            public string error = string.Empty;
+            public string title = string.Empty;
+            public string detail = string.Empty;
+            public string message = string.Empty;
         }
     }
 }
