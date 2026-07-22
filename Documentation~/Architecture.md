@@ -38,6 +38,7 @@ Backend SDK is a game-facing API, not a REST wrapper.
 - Application ID comes from Project Settings.
 - Storage paths: `/v1/storage/{applicationId}/{key}`
 - Leaderboard paths: `/v1/leaderboards/{applicationId}/{leaderboardName}`
+- Analytics path: `/v1/analytics/{applicationId}/events`
 - Game APIs never accept ApplicationId arguments.
 
 ## RequestId And Retry (Transport Layer)
@@ -77,6 +78,7 @@ Services never implement RequestId or Retry. Future modules (Analytics, Friends,
 - Auth
 - Storage
 - Leaderboards
+- Analytics
 
 ## Extension Strategy
 
@@ -88,6 +90,7 @@ Services never implement RequestId or Retry. Future modules (Analytics, Friends,
 
 ## Remaining Work
 
-- Analytics, Friends, Remote Config, Inventory, Daily Rewards
+- Analytics queue / batch / offline delivery
+- Friends, Remote Config, Inventory, Daily Rewards
 - Token refresh
 - Offline / cross-session delivery (optional future layer on top of current transport retry)

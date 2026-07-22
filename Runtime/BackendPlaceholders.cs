@@ -1,13 +1,6 @@
 namespace BackendSdk
 {
     /// <summary>
-    /// Entry point for future analytics features.
-    /// </summary>
-    public sealed partial class AnalyticsService
-    {
-    }
-
-    /// <summary>
     /// Entry point for future remote config features.
     /// </summary>
     public sealed partial class RemoteConfigService

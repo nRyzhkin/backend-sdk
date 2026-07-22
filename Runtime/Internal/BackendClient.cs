@@ -73,6 +73,16 @@ namespace BackendSdk.Internal
                 cancellationToken);
         }
 
+        internal Task PostJsonAsync(string path, string jsonBody, CancellationToken cancellationToken = default)
+        {
+            return transport.SendAsync<JsonRequestBody, EmptyResponse>(
+                HttpVerb.Post,
+                path,
+                new JsonRequestBody(jsonBody),
+                ResolveAuthorizationHeader(),
+                cancellationToken);
+        }
+
         private static string ResolveAuthorizationHeader()
         {
             return Backend.Auth.GetAuthorizationHeader();

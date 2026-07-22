@@ -23,6 +23,7 @@ await Backend.InitializeAsync();
 await Backend.Auth.LoginAsync();
 await Backend.Storage.SetAsync("Save", save);
 await Backend.Leaderboards.SubmitAsync("highscore", 1200, SortMode.Descending);
+await Backend.Analytics.TrackAsync("LevelStarted", new { level = 5, difficulty = "Hard" });
 ```
 
 Not:
@@ -57,6 +58,16 @@ var save = await Backend.Storage.GetAsync<MySave>("Save");
 await Backend.Leaderboards.SubmitAsync("highscore", 1500, SortMode.Descending);
 var top = await Backend.Leaderboards.GetTopAsync("highscore", limit: 50);
 var around = await Backend.Leaderboards.GetAroundPlayerAsync("highscore", range: 5);
+
+await Backend.Analytics.TrackAsync(
+    "LevelStarted",
+    new
+    {
+        level = 5,
+        difficulty = "Hard"
+    });
+
+await Backend.Analytics.TrackAsync("TutorialCompleted");
 ```
 
 ## Initialization Flow
@@ -89,7 +100,7 @@ Services such as Storage and Leaderboards never assemble tokens themselves.
 
 ## Automatic ApplicationId Usage
 
-Configured Application ID is inserted into Storage and Leaderboards URLs automatically.
+Configured Application ID is inserted into Storage, Leaderboards, and Analytics URLs automatically.
 
 Game code never passes ApplicationId.
 
@@ -137,6 +148,23 @@ await Backend.Leaderboards.SubmitAsync("highscore", 1500, SortMode.Descending);
 - `GetTopAsync(leaderboardName, limit = 100)`
 - `GetAroundPlayerAsync(leaderboardName, range = 5)`
 
+### Analytics
+
+- `TrackAsync(eventName, parameters = null)`
+
+```csharp
+await Backend.Analytics.TrackAsync(
+    "LevelStarted",
+    new
+    {
+        level = 5
+    });
+
+await Backend.Analytics.TrackAsync("TutorialCompleted");
+```
+
+Requires authentication. ApplicationId and JWT are added automatically.
+
 ## Current Public Surface
 
 - `Backend`
@@ -148,7 +176,8 @@ await Backend.Leaderboards.SubmitAsync("highscore", 1500, SortMode.Descending);
 - Authentication: `IAuthService`, `AuthService`, `LoginRequest`, `LoginResult`, `PlayerSession`
 - Storage: `IStorageService`, `StorageService`
 - Leaderboards: `ILeaderboardsService`, `LeaderboardsService`, `SortMode`, `LeaderboardEntry`, `LeaderboardSubmitResult`, `LeaderboardAroundResult`
-- Placeholder facades: Analytics, RemoteConfig, Friends, Inventory
+- Analytics: `IAnalyticsService`, `AnalyticsService`
+- Placeholder facades: RemoteConfig, Friends, Inventory
 
 ## Error Handling
 
@@ -185,6 +214,7 @@ Runtime/
 |- Auth/
 |- Storage/
 |- Leaderboards/
+|- Analytics/
 |- Internal/
 |- Backend.cs
 |- BackendException.cs
@@ -196,7 +226,7 @@ Samples~/
 
 ## Remaining TODOs
 
-- Analytics
+- Analytics queue / batch / offline delivery
 - Friends
 - Remote Config
 - Inventory

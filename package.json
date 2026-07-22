@@ -1,6 +1,6 @@
 {
   "name": "com.backend.sdk",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "displayName": "Backend SDK",
   "description": "Lightweight Unity package for backend-facing game services.",
   "unity": "6000.0",

@@ -20,6 +20,16 @@ public static class GameBootstrap
 
         await Backend.Leaderboards.SubmitAsync("highscore", 1000, SortMode.Descending);
         var top = await Backend.Leaderboards.GetTopAsync("highscore");
+
+        await Backend.Analytics.TrackAsync(
+            "LevelStarted",
+            new
+            {
+                level = 5,
+                difficulty = "Hard"
+            });
+
+        await Backend.Analytics.TrackAsync("TutorialCompleted");
     }
 }
 

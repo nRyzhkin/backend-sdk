@@ -4,6 +4,14 @@ All notable changes to this package will be documented in this file.
 
 The format is based on Keep a Changelog, and this package follows Semantic Versioning.
 
+## [0.3.0] - 2026-07-22
+
+### Added
+
+- Analytics module with `Backend.Analytics.TrackAsync(eventName, parameters)`.
+- Internal analytics JSON builder for arbitrary event parameters.
+- `BackendClient.PostJsonAsync` for pre-built JSON POST bodies.
+
 ## [0.2.1] - 2026-07-16
 
 ### Added

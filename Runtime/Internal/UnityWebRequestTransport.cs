@@ -162,7 +162,9 @@ namespace BackendSdk.Internal
 
             var payload = verb == HttpVerb.Get || verb == HttpVerb.Delete
                 ? string.Empty
-                : UnityJsonSerializer.Serialize(body);
+                : body is JsonRequestBody jsonRequest
+                    ? jsonRequest.Json
+                    : UnityJsonSerializer.Serialize(body);
 
             if (!string.IsNullOrEmpty(payload))
             {
