@@ -3,7 +3,7 @@
 1. Open `Project Settings > Backend`.
 2. Set Backend URL and Application ID.
 3. Optionally enable Development Mode and set Development Provider / External ID.
-4. Initialize and log in:
+4. Initialize and use services:
 
 ```csharp
 using BackendSdk;
@@ -13,6 +13,10 @@ public static class GameBootstrap
     public static async System.Threading.Tasks.Task StartAsync()
     {
         await Backend.InitializeAsync();
+
+        var apiUrl = await Backend.RemoteConfig.GetAsync<string>("apiUrl");
+        var maintenance = await Backend.RemoteConfig.GetAsync<bool>("maintenance");
+
         await Backend.Auth.LoginAsync();
 
         await Backend.Storage.SetAsync("Save", new MySave { Level = 1 });

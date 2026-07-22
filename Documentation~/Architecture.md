@@ -16,7 +16,7 @@ Backend SDK is a game-facing API, not a REST wrapper.
 3. `Backend.InitializeAsync()` loads that resource.
 4. Runtime caches Backend URL, Application ID, and retry settings in `Backend.Settings`.
 5. Transport and `BackendClient` are created once.
-6. Service facades (`Auth`, `Storage`, `Leaderboards`, ...) reuse the shared client.
+6. Service facades (`Auth`, `Storage`, `Leaderboards`, `Analytics`, `RemoteConfig`, ...) reuse the shared client.
 
 ## Authentication Flow
 
@@ -39,6 +39,7 @@ Backend SDK is a game-facing API, not a REST wrapper.
 - Storage paths: `/v1/storage/{applicationId}/{key}`
 - Leaderboard paths: `/v1/leaderboards/{applicationId}/{leaderboardName}`
 - Analytics path: `/v1/analytics/{applicationId}/events`
+- Remote Config paths: `/v1/remote-config/{applicationId}` and `/v1/remote-config/{applicationId}/{key}`
 - Game APIs never accept ApplicationId arguments.
 
 ## RequestId And Retry (Transport Layer)
@@ -53,7 +54,16 @@ Owned exclusively by `UnityWebRequestTransport`:
 6. Retries reuse the same RequestId and use a constant `RetryDelayMilliseconds`.
 7. Retry exists only for the duration of one method call. No offline queue.
 
-Services never implement RequestId or Retry. Future modules (Analytics, Friends, Chat, Purchases) automatically inherit this behavior by calling `BackendClient`.
+Services never implement RequestId or Retry. Future modules automatically inherit this behavior by calling `BackendClient`.
+
+## Remote Config
+
+- Read-only Game API
+- Anonymous (no login required)
+- No caching in iteration 1
+- Each `GetAsync` / `GetAllAsync` performs a fresh HTTP GET
+- Backend wire format `{ key, value }` is unwrapped into `RemoteConfigValue`
+- Arbitrary JSON supported through `RemoteConfigValue` and `GetAsync<T>()`
 
 ## Runtime Layers
 
@@ -70,6 +80,7 @@ Services never implement RequestId or Retry. Future modules (Analytics, Friends,
 - `IBackendTransport`
 - `UnityWebRequestTransport`
 - `RequestContext`
+- `RemoteConfigJson`
 - Wire-format DTOs for camelCase JSON
 - `UnityJsonSerializer`
 
@@ -79,6 +90,7 @@ Services never implement RequestId or Retry. Future modules (Analytics, Friends,
 - Storage
 - Leaderboards
 - Analytics
+- Remote Config
 
 ## Extension Strategy
 
@@ -91,6 +103,7 @@ Services never implement RequestId or Retry. Future modules (Analytics, Friends,
 ## Remaining Work
 
 - Analytics queue / batch / offline delivery
-- Friends, Remote Config, Inventory, Daily Rewards
+- Remote Config caching / background refresh
+- Friends, Inventory, Daily Rewards
 - Token refresh
 - Offline / cross-session delivery (optional future layer on top of current transport retry)

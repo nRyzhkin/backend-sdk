@@ -29,5 +29,20 @@ namespace BackendSdk.Internal
 
             return JsonUtility.FromJson<T>(json);
         }
+
+        internal static object Deserialize(string json, Type type)
+        {
+            if (type == typeof(string))
+            {
+                return json ?? string.Empty;
+            }
+
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return type.IsValueType ? Activator.CreateInstance(type) : null;
+            }
+
+            return JsonUtility.FromJson(json, type);
+        }
     }
 }

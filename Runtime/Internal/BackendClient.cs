@@ -83,6 +83,11 @@ namespace BackendSdk.Internal
                 cancellationToken);
         }
 
+        internal Task<string> GetRawAsync(string path, CancellationToken cancellationToken = default)
+        {
+            return GetAsync<string>(path, cancellationToken);
+        }
+
         private static string ResolveAuthorizationHeader()
         {
             return Backend.Auth.GetAuthorizationHeader();

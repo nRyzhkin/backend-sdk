@@ -4,6 +4,15 @@ All notable changes to this package will be documented in this file.
 
 The format is based on Keep a Changelog, and this package follows Semantic Versioning.
 
+## [0.4.0] - 2026-07-22
+
+### Added
+
+- Remote Config module with `GetAsync`, `GetAsync<T>`, and `GetAllAsync`.
+- `RemoteConfigValue` for arbitrary JSON values.
+- Internal `RemoteConfigJson` parser for backend wire formats.
+- Editor tests in `Tests~/RemoteConfig/`.
+
 ## [0.3.0] - 2026-07-22
 
 ### Added

@@ -1,194 +1,251 @@
 # Technical Lead Report
 
-Analytics client integration for `POST /v1/analytics/{applicationId}/events`.
+Remote Config read-only client integration.
 
 ## 1. Files Added
 
 | File | Purpose |
 |------|---------|
-| `Runtime/Analytics/IAnalyticsService.cs` | Public analytics contract |
-| `Runtime/Analytics/AnalyticsService.cs` | Thin analytics service implementation |
-| `Runtime/Internal/AnalyticsEventRequestDto.cs` | Internal wire contract (`eventName`, `parameters`) |
-| `Runtime/Internal/AnalyticsParametersJson.cs` | Builds analytics request JSON for arbitrary parameters |
-| `Runtime/Internal/JsonRequestBody.cs` | Passes pre-built JSON through existing transport |
+| `Runtime/RemoteConfig/IRemoteConfigService.cs` | Public remote config contract |
+| `Runtime/RemoteConfig/RemoteConfigService.cs` | Thin read-only service |
+| `Runtime/RemoteConfig/RemoteConfigValue.cs` | Public arbitrary JSON value wrapper (`JsonElement` equivalent) |
+| `Runtime/Internal/RemoteConfigJson.cs` | Parse backend JSON and deserialize typed values |
+| `Runtime/AssemblyInfo.cs` | `InternalsVisibleTo` for tests |
+| `Tests~/RemoteConfig/RemoteConfigJsonTests.cs` | JSON parsing unit tests |
+| `Tests~/RemoteConfig/Backend.Sdk.Tests.asmdef` | Editor test assembly |
 
 ## 2. Files Modified
 
 | File | Change |
 |------|--------|
-| `Runtime/Internal/BackendClient.cs` | Added `PostJsonAsync` for analytics POST bodies |
-| `Runtime/Internal/UnityWebRequestTransport.cs` | Sends `JsonRequestBody` without re-serializing |
-| `Runtime/BackendPlaceholders.cs` | Removed analytics placeholder |
-| `README.md` | Analytics usage and module list |
-| `Documentation~/Architecture.md` | Analytics route and module status |
-| `Samples~/GettingStarted/README.md` | Analytics example |
-| `CHANGELOG.md` | Version `0.3.0` entry |
-| `package.json` | Version bump to `0.3.0` |
+| `Runtime/Internal/BackendClient.cs` | Added `GetRawAsync` for raw JSON GET responses |
+| `Runtime/Internal/UnityJsonSerializer.cs` | Added untyped `Deserialize(string, Type)` for array elements |
+| `Runtime/BackendPlaceholders.cs` | Removed remote config placeholder |
+| `README.md` | Remote Config usage and constraints |
+| `Documentation~/Architecture.md` | Remote Config architecture notes |
+| `Samples~/GettingStarted/README.md` | Remote Config example before auth |
+| `CHANGELOG.md` | Version `0.4.0` |
+| `package.json` | Version bump |
 | `TECH_LEAD_REPORT.md` | This report |
 
-## 3. Public Analytics API
+Unchanged by design:
+
+- `UnityWebRequestTransport` (204 / empty body already supported)
+- Auth / Storage / Leaderboards / Analytics service logic
+- Public APIs of existing modules
+
+## 3. Public API
 
 ```csharp
 await Backend.InitializeAsync();
-await Backend.Auth.LoginAsync();
 
-await Backend.Analytics.TrackAsync(
-    "LevelStarted",
-    new
-    {
-        level = 5,
-        difficulty = "Hard"
-    });
+var apiUrl = await Backend.RemoteConfig.GetAsync<string>("apiUrl");
+var maintenance = await Backend.RemoteConfig.GetAsync<bool>("maintenance");
 
-await Backend.Analytics.TrackAsync("TutorialCompleted");
+var settings = await Backend.RemoteConfig.GetAsync<GameSettings>("gameSettings");
+
+var value = await Backend.RemoteConfig.GetAsync("cdnUrl");
+var cdnUrl = value.As<string>();
+
+var all = await Backend.RemoteConfig.GetAllAsync();
 ```
 
 Interface:
 
 ```csharp
-Task TrackAsync(
-    string eventName,
-    object parameters = null,
-    CancellationToken cancellationToken = default);
+Task<RemoteConfigValue> GetAsync(string key, CancellationToken cancellationToken = default);
+Task<T> GetAsync<T>(string key, CancellationToken cancellationToken = default);
+Task<Dictionary<string, RemoteConfigValue>> GetAllAsync(CancellationToken cancellationToken = default);
 ```
 
-Validation:
+`RemoteConfigValue` is used instead of `System.Text.Json.JsonElement` to avoid adding a new dependency and to fit Unity-friendly conventions.
 
-- `eventName` required, trimmed, max 128 chars
-- invalid `eventName` → `ArgumentException`
-- not initialized → `BackendException`
-- not authenticated → `BackendException` (`not_authenticated`)
+## 4. ApplicationId Resolution
 
-No breaking changes to existing public APIs.
+- Taken from `Backend.Settings.ApplicationId` via `BackendClient.ApplicationIdOrThrow()`
+- Inserted into paths:
+  - `GET v1/remote-config/{applicationId}`
+  - `GET v1/remote-config/{applicationId}/{key}`
+- Never accepted from game code
+- Prevents accidental cross-application reads through the public API
 
-## 4. Integration With BackendClient
+## 5. Authorization
 
-`AnalyticsService` flow:
+- Remote Config does **not** require `Backend.Auth.LoginAsync()`
+- Uses existing `BackendClient.GetRawAsync`
+- If a session exists, transport may still attach `Authorization` through the shared client path; backend public endpoints are anonymous
+- No Remote Config-specific JWT logic was added
 
-1. Validate `eventName`
-2. Require authenticated session
-3. Build JSON body via `AnalyticsParametersJson`
-4. Call `BackendClient.PostJsonAsync("v1/analytics/{applicationId}/events", json, token)`
+## 6. Backend Wire Format Compatibility
 
-`BackendClient` automatically provides:
+Actual `my-backend` public API returns:
 
-- `ServerUrl` via transport
-- `ApplicationId` in path via `ApplicationIdOrThrow()`
-- `Authorization: Bearer <JWT>` via `AuthService`
-- timeout, cancellation, retry, and `X-Request-Id` via existing transport
+**List**
 
-`AnalyticsService` contains no HTTP, retry, or token logic.
+```json
+[
+  { "key": "apiUrl", "value": "https://api.example.com" },
+  { "key": "maintenance", "value": false }
+]
+```
 
-## 5. Authorization And ApplicationId
+**Single entry**
 
-- JWT: reused from `AuthService.GetAuthorizationHeader()` through `BackendClient`
-- ApplicationId: inserted into URL path, never accepted from game code
-- Backend resolves `UserId` from JWT; game code never passes user identifiers
+```json
+{ "key": "apiUrl", "value": "https://api.example.com" }
+```
 
-## 6. 204 No Content Handling
+The SDK unwraps these into game-friendly values.
 
-Backend returns `204 No Content`.
+`RemoteConfigJson` also supports a flat object list response if the backend shape changes later:
 
-Existing transport behavior already supports this:
+```json
+{
+  "apiUrl": "https://api.example.com",
+  "maintenance": false
+}
+```
 
-- empty response body → `default(EmptyResponse)`
-- no deserialization attempt on empty payload
+## 7. JSON Serialization Approach
 
-`TrackAsync` awaits `PostJsonAsync` and completes normally on 204.
+Problem:
 
-## 7. Retry Behavior
+- `JsonUtility` cannot deserialize arbitrary JSON trees or nested `object` fields.
 
-No analytics-specific retry logic was added.
+Solution:
 
-`POST` analytics events use the existing transport retry policy:
+- `BackendClient.GetRawAsync` returns raw response text
+- `RemoteConfigJson` parses:
+  - backend entry array / wrapped entry
+  - optional flat object map
+  - primitive JSON values without double-encoding
+- `GetAsync<T>` uses:
+  - custom primitive parsing for `string`, `bool`, numeric types
+  - `JsonUtility` for `[Serializable]` DTO objects
+  - minimal array support for primitive arrays
 
-- transient failures may retry
-- same `X-Request-Id` is reused across retries for one logical call
-- constant delay from `RetryDelayMilliseconds`
+Examples:
 
-This is acceptable for collection-phase analytics. Separate queue/batch/idempotency is deferred.
+- JSON `"https://cdn.example.com"` → `GetAsync<string>` → `https://cdn.example.com`
+- JSON `100` → `GetAsync<int>` → `100`
+- JSON `{ "android": "...", "ios": "..." }` → `GetAsync<AssetUrls>`
 
-## 8. Why Separate Analytics Idempotency Was Not Added
+Deserialization failures throw `BackendException` with error code `remote_config_deserialization_failed` and context:
 
-Out of scope for this iteration:
+- ApplicationId
+- key
+- target type
 
-- local queue
+## 8. Error Handling
+
+| Case | Behavior |
+|------|----------|
+| SDK not initialized | `BackendException` (`backend_not_initialized`) |
+| Missing ApplicationId | `BackendException` (`missing_application_id`) |
+| Invalid key argument | `ArgumentException` |
+| Missing config key | backend `404` → existing `BackendException` with `StatusCode = 404` |
+| Backend unavailable | existing transport / `BackendException` |
+| Cancellation | existing `OperationCanceledException` propagation |
+| Type conversion failure | `BackendException` (`remote_config_deserialization_failed`) |
+
+No separate Remote Config error system was introduced.
+
+## 9. 204 / Empty Body
+
+Not applicable for Remote Config GET responses.
+
+Existing transport behavior remains used for other modules:
+
+- empty successful body → `default(TResponse)`
+
+## 10. Retry
+
+No Remote Config-specific retry logic.
+
+GET requests:
+
+- do not send `X-Request-Id`
+- use existing transport transient retry rules when applicable
+
+## 11. Caching
+
+Explicitly **not** implemented:
+
+- persistent cache
+- PlayerPrefs
+- disk cache
 - offline storage
-- batch endpoint
-- background worker
-- analytics-specific deduplication
+- background refresh
 
-Current design sends one event per `TrackAsync` call and relies on transport retry only within that call.
+Each `GetAsync` / `GetAllAsync` performs a fresh HTTP GET.
 
-## 9. JSON Serializer Limitations
+## 12. Iteration 1 Limitations
 
-`JsonUtility` cannot embed arbitrary `object` / anonymous parameters inside a DTO.
+Not implemented:
 
-Minimal adaptation:
+- Admin API in SDK
+- write/update/delete from game code
+- caching
+- versioning / rollback / draft states
+- environment switching
+- encryption / secrets handling beyond documentation warnings
 
-- `AnalyticsParametersJson` builds the full request JSON string
-- supports:
-  - `null` parameters (field omitted; backend stores `{}`)
-  - primitives and strings
-  - `Dictionary<string, object>` and other `IDictionary`
-  - `[Serializable]` DTOs via existing `UnityJsonSerializer`
-  - anonymous objects and plain CLR objects via public properties/fields (analytics-scoped reflection)
+Remote Config values are public data only. Do not store secrets.
 
-Limitations:
+JSON limitations:
 
-- no Newtonsoft / System.Text.Json added
-- complex nested graphs are not fully generalized
-- dictionary values must be JSON-compatible types
-- enums serialize as numeric values unless wrapped in a serializable DTO
+- complex polymorphic graphs are not fully generalized
+- array support is best-effort for primitive arrays and `[Serializable]` element types
+- dictionaries inside DTOs still follow `JsonUtility` constraints
 
-Auth / Storage / Leaderboards serialization paths were not changed.
+## 13. Tests
 
-## 10. Minimal Transport Change
+Added `Tests~/RemoteConfig/RemoteConfigJsonTests.cs` (Editor / `UNITY_INCLUDE_TESTS`):
 
-`UnityWebRequestTransport` now recognizes `JsonRequestBody` and sends its JSON verbatim.
+- backend entry array parsing
+- flat object parsing
+- wrapped entry value extraction
+- string without double-encoding
+- number / bool parsing
+- object DTO parsing
 
-This was required because `JsonUtility` cannot produce `{ "eventName": "...", "parameters": { ... } }` with arbitrary nested parameters.
+Run via Unity Test Runner after importing the package with Test Framework enabled.
 
-Change is limited to payload selection; retry, cancellation, auth, and RequestId behavior are unchanged.
+## 14. Unity Verification Checklist
 
-## 11. How To Verify In Unity
+1. `Backend.InitializeAsync()` works
+2. `Backend.RemoteConfig` is available
+3. Remote Config works without `Auth.LoginAsync()`
+4. `GetAsync<string>` works
+5. `GetAsync<int>` works
+6. `GetAsync<bool>` works
+7. `GetAsync<T>` works for `[Serializable]` DTO
+8. nested object works
+9. array values work for supported types
+10. `GetAllAsync()` returns all entries
+11. missing key returns `404` / `BackendException`
+12. backend down uses existing transport errors
+13. cancellation works
+14. Auth still works
+15. Storage still works
+16. Leaderboards still work
+17. Analytics still works
+18. `ApplicationId = game-1` only reads `game-1` data
 
-```csharp
-await Backend.InitializeAsync();
-await Backend.Auth.LoginAsync();
+## 15. Open Questions For Next Iteration
 
-await Backend.Analytics.TrackAsync(
-    "LevelStarted",
-    new { level = 5, difficulty = "Hard" });
+- Should Remote Config add in-memory session cache?
+- Should typed getters support `Dictionary<string, object>` directly?
+- Should list endpoint be normalized on backend to a flat object?
+- Should Remote Config expose metadata such as `updatedAt` in a future admin-only shape?
 
-await Backend.Analytics.TrackAsync("TutorialCompleted");
-```
+## 16. Public API Confirmation
 
-Expected checks:
+No breaking changes to existing modules.
 
-1. HTTP `204`
-2. row appears in backend `AnalyticsEvents`
-3. `EventName` matches input
-4. `ParametersJson` contains expected JSON for parameterized events
-5. `UserId` matches authenticated user
-6. `ApplicationId` matches Project Settings
-7. event without parameters succeeds
-8. unauthenticated call throws `BackendException`
-9. backend down → existing `BackendException`
-10. Auth / Storage / Leaderboards still work
+Additive API only:
 
-Enable `Enable Logging` to inspect transport logs including RequestId on POST retries.
-
-## 12. Open Questions For Next Iteration
-
-- Should analytics support fire-and-forget without awaiting?
-- Should failed analytics events be queued locally?
-- Should batch ingestion be added?
-- Should duplicate event suppression exist client-side?
-- Should serializer move to a shared non-reflection JSON builder for all modules?
-
-## 13. Public API Confirmation
-
-No breaking changes.
-
-`Backend.Analytics` is available after `Backend.InitializeAsync()` with the same lifecycle as other services.
+- `Backend.RemoteConfig`
+- `IRemoteConfigService`
+- `RemoteConfigService`
+- `RemoteConfigValue`

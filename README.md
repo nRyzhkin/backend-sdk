@@ -42,6 +42,15 @@ Backend.Get(...);
 ```csharp
 await Backend.InitializeAsync();
 
+var apiUrl =
+    await Backend.RemoteConfig.GetAsync<string>("apiUrl");
+
+var cdnUrl =
+    await Backend.RemoteConfig.GetAsync<string>("cdnUrl");
+
+var maintenance =
+    await Backend.RemoteConfig.GetAsync<bool>("maintenance");
+
 // Editor development flow
 await Backend.Auth.LoginAsync();
 
@@ -165,6 +174,34 @@ await Backend.Analytics.TrackAsync("TutorialCompleted");
 
 Requires authentication. ApplicationId and JWT are added automatically.
 
+### Remote Config
+
+- `GetAsync(key)` → `RemoteConfigValue`
+- `GetAsync<T>(key)`
+- `GetAllAsync()`
+
+```csharp
+await Backend.InitializeAsync();
+
+var apiUrl = await Backend.RemoteConfig.GetAsync<string>("apiUrl");
+var maintenance = await Backend.RemoteConfig.GetAsync<bool>("maintenance");
+
+var settings = await Backend.RemoteConfig.GetAsync<GameSettings>("gameSettings");
+
+var config = await Backend.RemoteConfig.GetAllAsync();
+var cdnUrl = config["cdnUrl"].As<string>();
+```
+
+Remote Config:
+
+- does **not** require authentication
+- is available after `Backend.InitializeAsync()`
+- is read-only on the Game API
+- is managed through the backend Admin Panel
+- supports arbitrary JSON values
+- must **not** store secrets, passwords, or private API keys
+- uses Application ID from SDK configuration automatically
+
 ## Current Public Surface
 
 - `Backend`
@@ -177,7 +214,8 @@ Requires authentication. ApplicationId and JWT are added automatically.
 - Storage: `IStorageService`, `StorageService`
 - Leaderboards: `ILeaderboardsService`, `LeaderboardsService`, `SortMode`, `LeaderboardEntry`, `LeaderboardSubmitResult`, `LeaderboardAroundResult`
 - Analytics: `IAnalyticsService`, `AnalyticsService`
-- Placeholder facades: RemoteConfig, Friends, Inventory
+- Remote Config: `IRemoteConfigService`, `RemoteConfigService`, `RemoteConfigValue`
+- Placeholder facades: Friends, Inventory
 
 ## Error Handling
 
@@ -215,6 +253,7 @@ Runtime/
 |- Storage/
 |- Leaderboards/
 |- Analytics/
+|- RemoteConfig/
 |- Internal/
 |- Backend.cs
 |- BackendException.cs
@@ -227,6 +266,7 @@ Samples~/
 ## Remaining TODOs
 
 - Analytics queue / batch / offline delivery
+- Remote Config caching / background refresh
 - Friends
 - Remote Config
 - Inventory
