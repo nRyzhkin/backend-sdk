@@ -29,7 +29,7 @@ namespace BackendSdk.Internal
             CancellationToken cancellationToken)
         {
             var maxAttempts = 1 + settings.RetryCount;
-            var context = CreateRequestContext(verb);
+            var context = CreateRequestContext(verb, body);
 
             BackendException lastTransientError = null;
 
@@ -164,7 +164,9 @@ namespace BackendSdk.Internal
                 ? string.Empty
                 : body is JsonRequestBody jsonRequest
                     ? jsonRequest.Json
-                    : UnityJsonSerializer.Serialize(body);
+                    : body is ReadOnlyJsonRequestBody readOnlyJsonRequest
+                        ? readOnlyJsonRequest.Json
+                        : UnityJsonSerializer.Serialize(body);
 
             if (!string.IsNullOrEmpty(payload))
             {
@@ -175,9 +177,9 @@ namespace BackendSdk.Internal
             return request;
         }
 
-        private static RequestContext CreateRequestContext(HttpVerb verb)
+        private static RequestContext CreateRequestContext(HttpVerb verb, object body)
         {
-            if (verb == HttpVerb.Get)
+            if (verb == HttpVerb.Get || body is ReadOnlyJsonRequestBody)
             {
                 return new RequestContext(null);
             }

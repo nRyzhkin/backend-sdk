@@ -77,6 +77,20 @@ await Backend.Analytics.TrackAsync(
     });
 
 await Backend.Analytics.TrackAsync("TutorialCompleted");
+
+var me = await Backend.Profiles.GetMeAsync();
+
+await Backend.Profiles.UpdateMeAsync(
+    "Player One",
+    "avatar_03",
+    new MyPublicProfileData
+    {
+        status = "Looking for team",
+        level = 12
+    });
+
+var publicProfile = await Backend.Profiles.GetAsync(me.UserId);
+var batch = await Backend.Profiles.GetBatchAsync(new[] { me.UserId, Guid.NewGuid() });
 ```
 
 ## Initialization Flow
@@ -202,6 +216,48 @@ Remote Config:
 - must **not** store secrets, passwords, or private API keys
 - uses Application ID from SDK configuration automatically
 
+### Player Profiles
+
+- `GetMeAsync()` — authenticated; backend lazily creates the profile
+- `UpdateMeAsync(displayName, avatarId, publicData)` — authenticated full replace with idempotent PUT retry
+- `GetAsync(userId)` — anonymous public profile lookup
+- `GetBatchAsync(userIds)` — anonymous batch lookup (max `ProfilesService.MaxBatchSize` = 100)
+
+```csharp
+await Backend.InitializeAsync();
+await Backend.Auth.LoginAsync();
+
+var me = await Backend.Profiles.GetMeAsync();
+
+await Backend.Profiles.UpdateMeAsync(
+    "Player One",
+    "avatar_03",
+    new MyPublicProfileData
+    {
+        status = "Looking for team",
+        level = 12,
+        badges = new[] { "founder", "tester" }
+    });
+
+var data = updated.GetPublicData<MyPublicProfileData>();
+
+var publicProfile = await Backend.Profiles.GetAsync(me.UserId);
+
+var batch = await Backend.Profiles.GetBatchAsync(new[] { me.UserId, Guid.NewGuid() });
+if (batch.TryGetProfile(me.UserId, out var profile))
+{
+    Debug.Log(profile.DisplayName);
+}
+```
+
+Player Profiles:
+
+- `GetMeAsync` / `UpdateMeAsync` require Player JWT
+- `GetAsync` / `GetBatchAsync` are anonymous and do not require sign-in after initialization
+- `PublicData` is client-controlled display data and must **not** be trusted for authoritative gameplay decisions
+- Real inventory, currency, purchases, verified achievements, and server rank belong in separate authoritative backend modules
+- Application ID is inserted automatically; game code never passes ApplicationId
+
 ## Current Public Surface
 
 - `Backend`
@@ -215,6 +271,7 @@ Remote Config:
 - Leaderboards: `ILeaderboardsService`, `LeaderboardsService`, `SortMode`, `LeaderboardEntry`, `LeaderboardSubmitResult`, `LeaderboardAroundResult`
 - Analytics: `IAnalyticsService`, `AnalyticsService`
 - Remote Config: `IRemoteConfigService`, `RemoteConfigService`, `RemoteConfigValue`
+- Player Profiles: `IProfilesService`, `ProfilesService`, `PlayerProfile`, `PlayerProfileBatchResult`
 - Placeholder facades: Friends, Inventory
 
 ## Error Handling
@@ -254,6 +311,7 @@ Runtime/
 |- Leaderboards/
 |- Analytics/
 |- RemoteConfig/
+|- Profiles/
 |- Internal/
 |- Backend.cs
 |- BackendException.cs
@@ -268,7 +326,6 @@ Samples~/
 - Analytics queue / batch / offline delivery
 - Remote Config caching / background refresh
 - Friends
-- Remote Config
 - Inventory
 - Daily Rewards
 - Token refresh

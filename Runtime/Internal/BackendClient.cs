@@ -88,6 +88,36 @@ namespace BackendSdk.Internal
             return GetAsync<string>(path, cancellationToken);
         }
 
+        internal Task<string> GetRawAnonymousAsync(string path, CancellationToken cancellationToken = default)
+        {
+            return transport.SendAsync<object, string>(
+                HttpVerb.Get,
+                path,
+                null,
+                null,
+                cancellationToken);
+        }
+
+        internal Task<string> PostJsonAnonymousAsync(string path, string jsonBody, CancellationToken cancellationToken = default)
+        {
+            return transport.SendAsync<ReadOnlyJsonRequestBody, string>(
+                HttpVerb.Post,
+                path,
+                new ReadOnlyJsonRequestBody(jsonBody),
+                null,
+                cancellationToken);
+        }
+
+        internal Task<string> PutJsonAsync(string path, string jsonBody, CancellationToken cancellationToken = default)
+        {
+            return transport.SendAsync<JsonRequestBody, string>(
+                HttpVerb.Put,
+                path,
+                new JsonRequestBody(jsonBody),
+                ResolveAuthorizationHeader(),
+                cancellationToken);
+        }
+
         private static string ResolveAuthorizationHeader()
         {
             return Backend.Auth.GetAuthorizationHeader();

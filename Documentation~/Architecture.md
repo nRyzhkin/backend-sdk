@@ -16,7 +16,7 @@ Backend SDK is a game-facing API, not a REST wrapper.
 3. `Backend.InitializeAsync()` loads that resource.
 4. Runtime caches Backend URL, Application ID, and retry settings in `Backend.Settings`.
 5. Transport and `BackendClient` are created once.
-6. Service facades (`Auth`, `Storage`, `Leaderboards`, `Analytics`, `RemoteConfig`, ...) reuse the shared client.
+6. Service facades (`Auth`, `Storage`, `Leaderboards`, `Analytics`, `RemoteConfig`, `Profiles`, ...) reuse the shared client.
 
 ## Authentication Flow
 
@@ -40,6 +40,7 @@ Backend SDK is a game-facing API, not a REST wrapper.
 - Leaderboard paths: `/v1/leaderboards/{applicationId}/{leaderboardName}`
 - Analytics path: `/v1/analytics/{applicationId}/events`
 - Remote Config paths: `/v1/remote-config/{applicationId}` and `/v1/remote-config/{applicationId}/{key}`
+- Profile paths: `/v1/profiles/{applicationId}/me`, `/v1/profiles/{applicationId}/{userPublicId}`, `/v1/profiles/{applicationId}/batch`
 - Game APIs never accept ApplicationId arguments.
 
 ## RequestId And Retry (Transport Layer)
@@ -64,6 +65,16 @@ Services never implement RequestId or Retry. Future modules automatically inheri
 - Each `GetAsync` / `GetAllAsync` performs a fresh HTTP GET
 - Backend wire format `{ key, value }` is unwrapped into `RemoteConfigValue`
 - Arbitrary JSON supported through `RemoteConfigValue` and `GetAsync<T>()`
+
+## Player Profiles
+
+- `GetMeAsync` / `UpdateMeAsync` require Player JWT
+- `GetAsync` / `GetBatchAsync` are anonymous (explicit `null` authorization on transport)
+- `GetMeAsync` relies on backend lazy profile creation; no separate create API in the SDK
+- `UpdateMeAsync` is a full replace (`displayName`, `avatarId`, `publicData`) via `PUT` with transport RequestId + retry
+- `GetBatchAsync` validates 1–100 IDs before local dedupe, rejects `Guid.Empty`, dedupes preserving first occurrence order
+- `PublicData` stored as raw JSON fragment; typed access via `PlayerProfile.GetPublicData<T>()`
+- `PublicData` is client-controlled display data only — not authoritative for inventory, currency, purchases, achievements, or rank
 
 ## Runtime Layers
 
@@ -91,6 +102,7 @@ Services never implement RequestId or Retry. Future modules automatically inheri
 - Leaderboards
 - Analytics
 - Remote Config
+- Player Profiles
 
 ## Extension Strategy
 

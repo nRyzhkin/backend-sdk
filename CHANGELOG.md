@@ -4,6 +4,19 @@ All notable changes to this package will be documented in this file.
 
 The format is based on Keep a Changelog, and this package follows Semantic Versioning.
 
+## [0.5.0] - 2026-07-22
+
+### Added
+
+- Player Profiles module with `GetMeAsync`, `UpdateMeAsync`, `GetAsync`, and `GetBatchAsync`.
+- `PlayerProfile` immutable model with typed `GetPublicData<T>()`.
+- `PlayerProfileBatchResult` with `Profiles`, `MissingUserIds`, `ByUserId`, and `TryGetProfile`.
+- `ProfilesService.MaxBatchSize = 100`.
+- Internal `ProfileJson` parser/serializer for profile wire format.
+- Anonymous transport helpers on `BackendClient` (`GetRawAnonymousAsync`, `PostJsonAnonymousAsync`).
+- `BackendClient.PutJsonAsync` for authenticated PUT with pre-built JSON bodies.
+- Editor tests in `Tests~/Profiles/`.
+
 ## [0.4.0] - 2026-07-22
 
 ### Added

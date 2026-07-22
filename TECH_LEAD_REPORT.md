@@ -1,251 +1,282 @@
 # Technical Lead Report
 
-Remote Config read-only client integration.
+Player Profiles client integration (SDK Iteration 1).
+
+Package version: **0.5.0**
 
 ## 1. Files Added
 
 | File | Purpose |
 |------|---------|
-| `Runtime/RemoteConfig/IRemoteConfigService.cs` | Public remote config contract |
-| `Runtime/RemoteConfig/RemoteConfigService.cs` | Thin read-only service |
-| `Runtime/RemoteConfig/RemoteConfigValue.cs` | Public arbitrary JSON value wrapper (`JsonElement` equivalent) |
-| `Runtime/Internal/RemoteConfigJson.cs` | Parse backend JSON and deserialize typed values |
-| `Runtime/AssemblyInfo.cs` | `InternalsVisibleTo` for tests |
-| `Tests~/RemoteConfig/RemoteConfigJsonTests.cs` | JSON parsing unit tests |
-| `Tests~/RemoteConfig/Backend.Sdk.Tests.asmdef` | Editor test assembly |
+| `Runtime/Profiles/IProfilesService.cs` | Public profiles contract |
+| `Runtime/Profiles/ProfilesService.cs` | Thin profiles service facade |
+| `Runtime/Profiles/PlayerProfile.cs` | Immutable profile model with `GetPublicData<T>()` |
+| `Runtime/Profiles/PlayerProfileBatchResult.cs` | Batch lookup result with ordered collections and lookup helpers |
+| `Runtime/Internal/ProfileJson.cs` | Parse/serialize profile wire format |
+| `Runtime/Internal/ReadOnlyJsonRequestBody.cs` | Marker for read-only POST bodies without `X-Request-Id` |
+| `Tests~/Profiles/PlayerProfileJsonTests.cs` | JSON parsing, validation, and serialization unit tests |
 
 ## 2. Files Modified
 
 | File | Change |
 |------|--------|
-| `Runtime/Internal/BackendClient.cs` | Added `GetRawAsync` for raw JSON GET responses |
-| `Runtime/Internal/UnityJsonSerializer.cs` | Added untyped `Deserialize(string, Type)` for array elements |
-| `Runtime/BackendPlaceholders.cs` | Removed remote config placeholder |
-| `README.md` | Remote Config usage and constraints |
-| `Documentation~/Architecture.md` | Remote Config architecture notes |
-| `Samples~/GettingStarted/README.md` | Remote Config example before auth |
-| `CHANGELOG.md` | Version `0.4.0` |
+| `Runtime/Backend.cs` | Added `Backend.Profiles` facade |
+| `Runtime/Internal/BackendClient.cs` | Added anonymous/PUT JSON helpers; batch uses `ReadOnlyJsonRequestBody` |
+| `Runtime/Internal/UnityWebRequestTransport.cs` | Skip `X-Request-Id` for `ReadOnlyJsonRequestBody` |
+| `Runtime/Internal/RemoteConfigJson.cs` | Exposed shared JSON helpers as `internal` |
+| `Runtime/Internal/AnalyticsParametersJson.cs` | Exposed `SerializeJsonValue` and `QuoteJsonString` |
+| `README.md` | Profiles usage, auth matrix, PublicData trust warning |
+| `Documentation~/Architecture.md` | Profiles architecture notes |
+| `Samples~/GettingStarted/README.md` | Profiles integration sample |
+| `CHANGELOG.md` | Version `0.5.0` |
 | `package.json` | Version bump |
 | `TECH_LEAD_REPORT.md` | This report |
 
 Unchanged by design:
 
-- `UnityWebRequestTransport` (204 / empty body already supported)
-- Auth / Storage / Leaderboards / Analytics service logic
+- Write operations (`POST`/`PUT`/`DELETE` with `JsonRequestBody` or DTO bodies) still send `X-Request-Id`
+- Auth / Storage / Leaderboards / Analytics / Remote Config service logic
 - Public APIs of existing modules
 
 ## 3. Public API
 
 ```csharp
 await Backend.InitializeAsync();
+await Backend.Auth.LoginAsync();
 
-var apiUrl = await Backend.RemoteConfig.GetAsync<string>("apiUrl");
-var maintenance = await Backend.RemoteConfig.GetAsync<bool>("maintenance");
+var me = await Backend.Profiles.GetMeAsync();
 
-var settings = await Backend.RemoteConfig.GetAsync<GameSettings>("gameSettings");
+var updated = await Backend.Profiles.UpdateMeAsync(
+    "Player One",
+    "avatar_03",
+    new MyPublicProfileData
+    {
+        status = "Looking for team",
+        level = 12,
+        badges = new[] { "founder", "tester" }
+    });
 
-var value = await Backend.RemoteConfig.GetAsync("cdnUrl");
-var cdnUrl = value.As<string>();
+var data = updated.GetPublicData<MyPublicProfileData>();
 
-var all = await Backend.RemoteConfig.GetAllAsync();
+var publicProfile = await Backend.Profiles.GetAsync(updated.UserId);
+
+var batch = await Backend.Profiles.GetBatchAsync(new[] { updated.UserId, Guid.NewGuid() });
+if (batch.TryGetProfile(updated.UserId, out var profile))
+{
+    Debug.Log(profile.DisplayName);
+}
 ```
 
 Interface:
 
 ```csharp
-Task<RemoteConfigValue> GetAsync(string key, CancellationToken cancellationToken = default);
-Task<T> GetAsync<T>(string key, CancellationToken cancellationToken = default);
-Task<Dictionary<string, RemoteConfigValue>> GetAllAsync(CancellationToken cancellationToken = default);
+Task<PlayerProfile> GetMeAsync(CancellationToken cancellationToken = default);
+
+Task<PlayerProfile> UpdateMeAsync<TPublicData>(
+    string displayName,
+    string avatarId,
+    TPublicData publicData,
+    CancellationToken cancellationToken = default);
+
+Task<PlayerProfile> UpdateMeAsync(
+    string displayName,
+    string avatarId,
+    string publicDataJson,
+    CancellationToken cancellationToken = default);
+
+Task<PlayerProfile> GetAsync(Guid userId, CancellationToken cancellationToken = default);
+
+Task<PlayerProfileBatchResult> GetBatchAsync(
+    IReadOnlyCollection<Guid> userIds,
+    CancellationToken cancellationToken = default);
 ```
 
-`RemoteConfigValue` is used instead of `System.Text.Json.JsonElement` to avoid adding a new dependency and to fit Unity-friendly conventions.
+Constants:
+
+- `ProfilesService.MaxBatchSize = 100`
 
 ## 4. ApplicationId Resolution
 
 - Taken from `Backend.Settings.ApplicationId` via `BackendClient.ApplicationIdOrThrow()`
 - Inserted into paths:
-  - `GET v1/remote-config/{applicationId}`
-  - `GET v1/remote-config/{applicationId}/{key}`
+  - `GET v1/profiles/{applicationId}/me`
+  - `PUT v1/profiles/{applicationId}/me`
+  - `GET v1/profiles/{applicationId}/{userPublicId}`
+  - `POST v1/profiles/{applicationId}/batch`
 - Never accepted from game code
-- Prevents accidental cross-application reads through the public API
 
-## 5. Authorization
+## 5. Authorization Matrix
 
-- Remote Config does **not** require `Backend.Auth.LoginAsync()`
-- Uses existing `BackendClient.GetRawAsync`
-- If a session exists, transport may still attach `Authorization` through the shared client path; backend public endpoints are anonymous
-- No Remote Config-specific JWT logic was added
+| Method | Auth | Transport |
+|--------|------|-----------|
+| `GetMeAsync` | Player JWT required | `GetRawAsync` |
+| `UpdateMeAsync` | Player JWT required | `PutJsonAsync` (Bearer + `X-Request-Id`) |
+| `GetAsync` | Anonymous | `GetRawAnonymousAsync` |
+| `GetBatchAsync` | Anonymous | `PostJsonAnonymousAsync` |
+
+`GetMeAsync` / `UpdateMeAsync` throw `BackendException` (`not_authenticated`) when no session exists.
+
+`GetAsync` / `GetBatchAsync` work after `Backend.InitializeAsync()` without `Auth.LoginAsync()`.
 
 ## 6. Backend Wire Format Compatibility
 
-Actual `my-backend` public API returns:
+Aligned with `my-backend` Player Profiles Iteration 1 + 2.
 
-**List**
-
-```json
-[
-  { "key": "apiUrl", "value": "https://api.example.com" },
-  { "key": "maintenance", "value": false }
-]
-```
-
-**Single entry**
-
-```json
-{ "key": "apiUrl", "value": "https://api.example.com" }
-```
-
-The SDK unwraps these into game-friendly values.
-
-`RemoteConfigJson` also supports a flat object list response if the backend shape changes later:
+**Profile response**
 
 ```json
 {
-  "apiUrl": "https://api.example.com",
-  "maintenance": false
+  "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "applicationId": "test-game",
+  "displayName": "Player",
+  "avatarId": null,
+  "publicData": { "status": "Online" },
+  "createdAt": "2026-07-22T12:00:00Z",
+  "updatedAt": "2026-07-22T12:05:00Z"
 }
+```
+
+**Update request**
+
+```json
+{
+  "displayName": "Player One",
+  "avatarId": "avatar_03",
+  "publicData": { "status": "Looking for team" }
+}
+```
+
+**Batch request / response**
+
+```json
+{ "userIds": ["guid-1", "guid-2"] }
+{ "profiles": [ ... ], "missingUserIds": ["guid-2"] }
 ```
 
 ## 7. JSON Serialization Approach
 
-Problem:
+- `ProfileJson.ParseProfile` stores `publicData` as a raw JSON fragment
+- `PlayerProfile.GetPublicData<T>()` uses `RemoteConfigJson.DeserializeValue<T>`
+- `ProfileJson.BuildUpdateRequest` uses `AnalyticsParametersJson.SerializeJsonValue` so `publicData` is a native JSON object
+- Raw JSON overload embeds a validated JSON object directly
+- `avatarId: null` preserved
+- `DateTime` parsed as UTC via `DateTimeStyles.RoundtripKind`
+- Malformed GUID/JSON throws `BackendException` (`profile_deserialization_failed`)
 
-- `JsonUtility` cannot deserialize arbitrary JSON trees or nested `object` fields.
+No new public JSON DOM type. `RemoteConfigValue` was not reused to avoid semantic coupling.
 
-Solution:
+## 8. Lazy Profile Creation
 
-- `BackendClient.GetRawAsync` returns raw response text
-- `RemoteConfigJson` parses:
-  - backend entry array / wrapped entry
-  - optional flat object map
-  - primitive JSON values without double-encoding
-- `GetAsync<T>` uses:
-  - custom primitive parsing for `string`, `bool`, numeric types
-  - `JsonUtility` for `[Serializable]` DTO objects
-  - minimal array support for primitive arrays
+- `GetMeAsync` calls `GET /v1/profiles/{applicationId}/me`
+- Backend creates the profile when missing
+- SDK does not expose a separate create operation
 
-Examples:
+## 9. Update Semantics
 
-- JSON `"https://cdn.example.com"` → `GetAsync<string>` → `https://cdn.example.com`
-- JSON `100` → `GetAsync<int>` → `100`
-- JSON `{ "android": "...", "ios": "..." }` → `GetAsync<AssetUrls>`
+- `PUT /me` fully replaces `displayName`, `avatarId`, and `publicData`
+- One `X-Request-Id` per `UpdateMeAsync` call, reused across transient retries
+- `CancellationToken` honored on every attempt through existing transport
 
-Deserialization failures throw `BackendException` with error code `remote_config_deserialization_failed` and context:
+## 10. Batch Semantics
 
-- ApplicationId
-- key
-- target type
+SDK-side validation before HTTP:
 
-## 8. Error Handling
+| Rule | Exception |
+|------|-----------|
+| `userIds == null` | `ArgumentNullException` |
+| empty collection | `ArgumentException` |
+| more than 100 IDs (before dedupe) | `ArgumentException` |
+| `Guid.Empty` | `ArgumentException` |
+
+Local dedupe removes duplicates while preserving first-occurrence order.
+
+Response collections are never null. `TryGetProfile` and `ByUserId` support leaderboard enrichment.
+
+## 11. Error Handling
 
 | Case | Behavior |
 |------|----------|
 | SDK not initialized | `BackendException` (`backend_not_initialized`) |
-| Missing ApplicationId | `BackendException` (`missing_application_id`) |
-| Invalid key argument | `ArgumentException` |
-| Missing config key | backend `404` → existing `BackendException` with `StatusCode = 404` |
-| Backend unavailable | existing transport / `BackendException` |
-| Cancellation | existing `OperationCanceledException` propagation |
-| Type conversion failure | `BackendException` (`remote_config_deserialization_failed`) |
+| Unauthenticated protected calls | `BackendException` (`not_authenticated`) |
+| Missing public profile | `BackendException` with `StatusCode = 404` |
+| Backend validation error | `BackendException` with status code and server message |
+| Malformed profile JSON | `BackendException` (`profile_deserialization_failed`) |
+| Invalid batch arguments | `ArgumentException` / `ArgumentNullException` |
+| Cancellation | `OperationCanceledException` |
 
-No separate Remote Config error system was introduced.
+No separate `ProfilesException`.
 
-## 9. 204 / Empty Body
+## 12. PublicData Trust Warning
 
-Not applicable for Remote Config GET responses.
+PublicData is client-controlled display data and must not be trusted for authoritative gameplay decisions.
 
-Existing transport behavior remains used for other modules:
+Real inventory, currency, purchases, verified achievements, and server rank belong in separate authoritative backend modules.
 
-- empty successful body → `default(TResponse)`
+## 13. Retry / RequestId
 
-## 10. Retry
+| Operation | Verb | X-Request-Id | Retry |
+|-----------|------|--------------|-------|
+| `GetMeAsync` | GET | No | Transient read retry |
+| `UpdateMeAsync` | PUT | Yes | Transient write retry, stable RequestId |
+| `GetAsync` | GET | No | Transient read retry |
+| `GetBatchAsync` | POST | **No** | Transient read retry (no idempotency) |
 
-No Remote Config-specific retry logic.
+### X-Request-Id audit (Profiles batch)
 
-GET requests:
+**Finding:** before the fix, `UnityWebRequestTransport.CreateRequestContext` generated a RequestId for every non-GET verb, so `GetBatchAsync` incorrectly sent `X-Request-Id` on `POST /profiles/batch`.
 
-- do not send `X-Request-Id`
-- use existing transport transient retry rules when applicable
+**Path traced:**
 
-## 11. Caching
+`ProfilesService.GetBatchAsync` → `BackendClient.PostJsonAnonymousAsync` → `UnityWebRequestTransport.SendAsync(POST, ReadOnlyJsonRequestBody, …)` → `CreateRequest` → `SetRequestHeader("X-Request-Id", …)` only when `context.RequestId` is set.
 
-Explicitly **not** implemented:
+**Fix:** `PostJsonAnonymousAsync` wraps the body in `ReadOnlyJsonRequestBody`. Transport treats this marker like GET: `RequestContext.RequestId = null`, so the header is not sent. `UpdateMeAsync` and other write operations are unchanged (`JsonRequestBody` / DTO bodies still get RequestId).
 
-- persistent cache
-- PlayerPrefs
-- disk cache
-- offline storage
-- background refresh
+**Confirmed for `GetBatchAsync`:**
 
-Each `GetAsync` / `GetAllAsync` performs a fresh HTTP GET.
+- Uses anonymous POST via `PostJsonAnonymousAsync`
+- `X-Request-Id` is **not** sent
+- No idempotency semantics; POST chosen only because batch user ID lists exceed practical GET URL limits
+- Transient network retry may still occur via the shared transport loop (same as GET), but without RequestId reuse
 
-## 12. Iteration 1 Limitations
+## 14. Not Implemented
 
-Not implemented:
+- Profile search, explicit create, PATCH/merge, admin API
+- Avatar upload, friends, inventory, achievements, rank
+- Leaderboard auto-enrichment, local cache, offline fallback
+- ETag, polling, profile change events
+- New parallel HTTP infrastructure
 
-- Admin API in SDK
-- write/update/delete from game code
-- caching
-- versioning / rollback / draft states
-- environment switching
-- encryption / secrets handling beyond documentation warnings
+## 15. Tests
 
-Remote Config values are public data only. Do not store secrets.
+`Tests~/Profiles/PlayerProfileJsonTests.cs` covers:
 
-JSON limitations:
+1. Profile response parsing
+2. Nested PublicData types
+3. `GetPublicData<T>`
+4. Batch response order and lookup
+5. Validation rules
+6. Update/batch request serialization
+7. Local dedupe
 
-- complex polymorphic graphs are not fully generalized
-- array support is best-effort for primitive arrays and `[Serializable]` element types
-- dictionaries inside DTOs still follow `JsonUtility` constraints
+No mock HTTP transport was added.
 
-## 13. Tests
+## 16. Unity Verification Checklist
 
-Added `Tests~/RemoteConfig/RemoteConfigJsonTests.cs` (Editor / `UNITY_INCLUDE_TESTS`):
+1. `Backend.Profiles` available after initialization
+2. `GetMeAsync` requires login; lazy create on backend
+3. `UpdateMeAsync` sends native JSON `publicData` object
+4. `GetAsync` / `GetBatchAsync` work without login
+5. Batch max 100, rejects `Guid.Empty`, dedupes locally
+6. `404` / `401` map to `BackendException`
+7. Existing modules still work
+8. Package version `0.5.0`
 
-- backend entry array parsing
-- flat object parsing
-- wrapped entry value extraction
-- string without double-encoding
-- number / bool parsing
-- object DTO parsing
+## 17. Public API Confirmation
 
-Run via Unity Test Runner after importing the package with Test Framework enabled.
+No breaking changes. Additive API only:
 
-## 14. Unity Verification Checklist
-
-1. `Backend.InitializeAsync()` works
-2. `Backend.RemoteConfig` is available
-3. Remote Config works without `Auth.LoginAsync()`
-4. `GetAsync<string>` works
-5. `GetAsync<int>` works
-6. `GetAsync<bool>` works
-7. `GetAsync<T>` works for `[Serializable]` DTO
-8. nested object works
-9. array values work for supported types
-10. `GetAllAsync()` returns all entries
-11. missing key returns `404` / `BackendException`
-12. backend down uses existing transport errors
-13. cancellation works
-14. Auth still works
-15. Storage still works
-16. Leaderboards still work
-17. Analytics still works
-18. `ApplicationId = game-1` only reads `game-1` data
-
-## 15. Open Questions For Next Iteration
-
-- Should Remote Config add in-memory session cache?
-- Should typed getters support `Dictionary<string, object>` directly?
-- Should list endpoint be normalized on backend to a flat object?
-- Should Remote Config expose metadata such as `updatedAt` in a future admin-only shape?
-
-## 16. Public API Confirmation
-
-No breaking changes to existing modules.
-
-Additive API only:
-
-- `Backend.RemoteConfig`
-- `IRemoteConfigService`
-- `RemoteConfigService`
-- `RemoteConfigValue`
+- `Backend.Profiles`
+- `IProfilesService`
+- `ProfilesService`
+- `PlayerProfile`
+- `PlayerProfileBatchResult`

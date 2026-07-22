@@ -161,7 +161,7 @@ namespace BackendSdk.Internal
             return result;
         }
 
-        private static string ParseJsonString(string json)
+        internal static string ParseJsonString(string json)
         {
             var trimmed = json.Trim();
             if (trimmed.Length >= 2 && trimmed[0] == '"' && trimmed[^1] == '"')
@@ -282,7 +282,7 @@ namespace BackendSdk.Internal
             return UnityJsonSerializer.Deserialize(valueJson, targetType);
         }
 
-        private static bool TryGetObjectProperty(string json, string propertyName, out string valueJson)
+        internal static bool TryGetObjectProperty(string json, string propertyName, out string valueJson)
         {
             valueJson = null;
             var trimmed = json.Trim();
@@ -303,7 +303,7 @@ namespace BackendSdk.Internal
             return false;
         }
 
-        private static List<string> SplitTopLevelArray(string json)
+        internal static List<string> SplitTopLevelArray(string json)
         {
             var items = new List<string>();
             var trimmed = json.Trim();

@@ -9,6 +9,16 @@ namespace BackendSdk.Internal
 {
     internal static class AnalyticsParametersJson
     {
+        internal static string SerializeJsonValue(object value)
+        {
+            return SerializeValue(value);
+        }
+
+        internal static string QuoteJsonString(string value)
+        {
+            return Quote(value);
+        }
+
         internal static string BuildRequestJson(string eventName, object parameters)
         {
             var builder = new StringBuilder();

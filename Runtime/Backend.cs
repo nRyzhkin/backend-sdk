@@ -39,6 +39,11 @@ namespace BackendSdk
         public static RemoteConfigService RemoteConfig { get; } = new RemoteConfigService();
 
         /// <summary>
+        /// Gets the player profiles service facade.
+        /// </summary>
+        public static ProfilesService Profiles { get; } = new ProfilesService();
+
+        /// <summary>
         /// Gets the friends service facade.
         /// </summary>
         public static FriendsService Friends { get; } = new FriendsService();
