@@ -16,7 +16,7 @@ Backend SDK is a game-facing API, not a REST wrapper.
 3. `Backend.InitializeAsync()` loads that resource.
 4. Runtime caches Backend URL, Application ID, and retry settings in `Backend.Settings`.
 5. Transport and `BackendClient` are created once.
-6. Service facades (`Auth`, `Storage`, `Leaderboards`, `Analytics`, `RemoteConfig`, `Profiles`, ...) reuse the shared client.
+6. Service facades (`Auth`, `Storage`, `Leaderboards`, `Analytics`, `RemoteConfig`, `Profiles`, `Economy`, ...) reuse the shared client.
 
 ## Authentication Flow
 
@@ -41,6 +41,7 @@ Backend SDK is a game-facing API, not a REST wrapper.
 - Analytics path: `/v1/analytics/{applicationId}/events`
 - Remote Config paths: `/v1/remote-config/{applicationId}` and `/v1/remote-config/{applicationId}/{key}`
 - Profile paths: `/v1/profiles/{applicationId}/me`, `/v1/profiles/{applicationId}/{userPublicId}`, `/v1/profiles/{applicationId}/batch`
+- Economy path: `/v1/economy/{applicationId}/me`
 - Game APIs never accept ApplicationId arguments.
 
 ## RequestId And Retry (Transport Layer)
@@ -76,6 +77,19 @@ Services never implement RequestId or Retry. Future modules automatically inheri
 - `PublicData` stored as raw JSON fragment; typed access via `PlayerProfile.GetPublicData<T>()`
 - `PublicData` is client-controlled display data only — not authoritative for inventory, currency, purchases, achievements, or rank
 
+## Player Economy
+
+- Read-only player SDK — no grant, spend, set, consume, or revoke operations
+- `GetDefinitionsAsync` / `GetStateAsync` / `RefreshAsync` require Player JWT
+- `/me` returns the full active catalog merged with player balances/quantities; inactive definitions are excluded
+- No separate player definitions endpoint; `GetDefinitionsAsync` reads the active catalog from `/me`
+- In-memory cache with single-flight loading; cleared on logout, session change, and `ClearCache()`
+- Stale in-flight responses do not populate cache after session change (generation guard)
+- Caller `CancellationToken` cancels waiting only; shared HTTP load uses `CancellationToken.None`
+- SDK validation: `dotnet test` (57 tests). Economy subset: `dotnet test --filter TestCategory=Economy`
+- `PlayerEconomyState` helpers return `0` / `false` for missing resources (not an error)
+- Admin economy routes under `/admin/api/applications/{applicationId}/economy/...` are intentionally excluded
+
 ## Runtime Layers
 
 ### Public Facade
@@ -92,6 +106,7 @@ Services never implement RequestId or Retry. Future modules automatically inheri
 - `UnityWebRequestTransport`
 - `RequestContext`
 - `RemoteConfigJson`
+- `EconomyJson`
 - Wire-format DTOs for camelCase JSON
 - `UnityJsonSerializer`
 
@@ -103,6 +118,7 @@ Services never implement RequestId or Retry. Future modules automatically inheri
 - Analytics
 - Remote Config
 - Player Profiles
+- Player Economy
 
 ## Extension Strategy
 

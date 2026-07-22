@@ -4,6 +4,27 @@ All notable changes to this package will be documented in this file.
 
 The format is based on Keep a Changelog, and this package follows Semantic Versioning.
 
+## [0.6.1] - 2026-07-22
+
+### Changed
+
+- Economy tests in `Tests~/Economy/` now run through `dotnet test` via `Backend.Sdk.DotNetTests`.
+- Added `Shared/Backend.Sdk.Runtime` and `Shared/Backend.Sdk.UnityStubs` for headless runtime compilation.
+- MSBuild artifact paths moved to root `Directory.Build.props` (fixes MSB3539).
+
+## [0.6.0] - 2026-07-22
+
+### Added
+
+- Player Economy module with `GetDefinitionsAsync`, `GetStateAsync`, `RefreshAsync`, and `ClearCache`.
+- `EconomyDefinitions`, `CurrencyDefinition`, `EntitlementDefinition`, and `EntitlementKind`.
+- `PlayerEconomyState` with `GetCurrencyBalance`, `HasEntitlement`, and `GetEntitlementQuantity` helpers.
+- `PlayerCurrencyBalance` and `PlayerEntitlement` immutable models.
+- Internal `EconomyJson` parser for `GET /v1/economy/{applicationId}/me`.
+- In-memory cache with single-flight loading for definitions and player state.
+- Economy cache invalidation on logout and session change.
+- Editor tests in `Tests~/Economy/` and transport header tests for economy GET.
+
 ## [0.5.0] - 2026-07-22
 
 ### Added

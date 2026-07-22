@@ -1,8 +1,10 @@
 <Solution>
-  <Folder Name="/DotNetTests/">
-    <Project Path="DotNetTests/Backend.Sdk.DotNetTests.csproj" />
+  <Folder Name="/DotNetTests~/">
+    <Project Path="DotNetTests~/Backend.Sdk.DotNetTests.csproj" />
   </Folder>
   <Folder Name="/Shared/">
     <Project Path="Shared/Backend.Sdk.Transport.Core/Backend.Sdk.Transport.Core.csproj" />
+    <Project Path="Shared/Backend.Sdk.UnityStubs/Backend.Sdk.UnityStubs.csproj" />
+    <Project Path="Shared/Backend.Sdk.Runtime/Backend.Sdk.Runtime.csproj" />
   </Folder>
 </Solution>

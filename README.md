@@ -258,6 +258,49 @@ Player Profiles:
 - Real inventory, currency, purchases, verified achievements, and server rank belong in separate authoritative backend modules
 - Application ID is inserted automatically; game code never passes ApplicationId
 
+### Economy
+
+- `GetDefinitionsAsync()` — authenticated; returns the active catalog from the player economy endpoint
+- `GetStateAsync(forceRefresh = false)` — authenticated player economy state with in-memory cache
+- `RefreshAsync()` — force refresh from backend
+- `ClearCache()` — clears cached definitions and state
+
+```csharp
+await Backend.InitializeAsync();
+await Backend.Auth.LoginAsync();
+
+var state = await Backend.Economy.GetStateAsync();
+
+long gold = state.GetCurrencyBalance("gold");
+bool removeAds = state.HasEntitlement("remove_ads");
+long tickets = state.GetEntitlementQuantity("arena_ticket");
+
+var definitions = await Backend.Economy.GetDefinitionsAsync();
+if (definitions.TryGetCurrencyDefinition("gold", out var goldDefinition))
+{
+    Debug.Log(goldDefinition.DisplayName);
+}
+```
+
+Refreshing after a server-authoritative action:
+
+```csharp
+await PerformServerAuthoritativeActionAsync();
+var refreshed = await Backend.Economy.RefreshAsync();
+```
+
+Economy:
+
+- requires Player JWT for all operations
+- is read-only on the player SDK — no grant, spend, set, consume, or revoke operations
+- `GetDefinitionsAsync` returns the backend's active catalog merged with player state from `/me` (inactive definitions and admin metadata are excluded)
+- definitions and state are cached in memory and cleared on logout or session change
+- Caller `CancellationToken` cancels waiting only; a shared in-flight HTTP request is not cancelled for other callers
+- SDK tests run via `dotnet test` (57 tests); Economy subset: `dotnet test --filter TestCategory=Economy`
+- the backend is the source of truth for balances and entitlements
+- rewards and mutations are performed by authoritative backend modules (Daily Rewards, Store, Battle Pass, etc.)
+- Application ID is inserted automatically; game code never passes ApplicationId
+
 ## Current Public Surface
 
 - `Backend`
@@ -272,6 +315,7 @@ Player Profiles:
 - Analytics: `IAnalyticsService`, `AnalyticsService`
 - Remote Config: `IRemoteConfigService`, `RemoteConfigService`, `RemoteConfigValue`
 - Player Profiles: `IProfilesService`, `ProfilesService`, `PlayerProfile`, `PlayerProfileBatchResult`
+- Economy: `IEconomyService`, `EconomyService`, `EconomyDefinitions`, `CurrencyDefinition`, `EntitlementDefinition`, `EntitlementKind`, `PlayerEconomyState`, `PlayerCurrencyBalance`, `PlayerEntitlement`
 - Placeholder facades: Friends, Inventory
 
 ## Error Handling
@@ -312,6 +356,7 @@ Runtime/
 |- Analytics/
 |- RemoteConfig/
 |- Profiles/
+|- Economy/
 |- Internal/
 |- Backend.cs
 |- BackendException.cs
@@ -338,13 +383,37 @@ Samples~/
 - `Samples~/GettingStarted/README.md`
 - `TECH_LEAD_REPORT.md`
 
-## .NET Transport Tests
+## .NET Tests
 
-Pure transport/header regression tests run without Unity:
+All SDK regression tests run without Unity:
 
 ```bash
 dotnet restore
+dotnet build
 dotnet test
 ```
 
-See `DotNetTests/` and `Shared/Backend.Sdk.Transport.Core/`.
+List discovered tests:
+
+```bash
+dotnet test --list-tests
+```
+
+Run only Economy tests:
+
+```bash
+dotnet test --filter TestCategory=Economy
+```
+
+Current test count: **57** (`Backend.Sdk.DotNetTests`).
+
+Economy tests live in `Tests~/Economy/` and are compiled into `Backend.Sdk.DotNetTests` via source links. Production runtime code is compiled from `Runtime/` through `Shared/Backend.Sdk.Runtime/` (no duplicated Economy sources).
+
+Unity Test Runner is not required for SDK validation.
+
+Project layout:
+
+- `DotNetTests~/` — NUnit test project entry point
+- `Shared/Backend.Sdk.Runtime/` — linked `Runtime/` sources for dotnet builds
+- `Shared/Backend.Sdk.UnityStubs/` — minimal Unity API stubs for headless tests
+- `Shared/Backend.Sdk.Transport.Core/` — shared transport primitives

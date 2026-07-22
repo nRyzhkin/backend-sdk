@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <RootNamespace>BackendSdk</RootNamespace>
+    <AssemblyName>Backend.Sdk.Runtime</AssemblyName>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <IsPackable>false</IsPackable>
+    <DefineConstants>BACKEND_SDK_DOTNET</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Backend.Sdk.Transport.Core\Backend.Sdk.Transport.Core.csproj" />
+    <ProjectReference Include="..\Backend.Sdk.UnityStubs\Backend.Sdk.UnityStubs.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\Runtime\**\*.cs" Link="Runtime\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Remove="..\..\Runtime\Internal\RuntimeSettingsLoader.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Backend.Sdk.DotNetTests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Backend.Sdk.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>

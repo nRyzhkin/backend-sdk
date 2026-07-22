@@ -4,12 +4,20 @@
     <RootNamespace>BackendSdk.DotNetTests</RootNamespace>
     <AssemblyName>Backend.Sdk.DotNetTests</AssemblyName>
     <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
     <Nullable>disable</Nullable>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Shared\Backend.Sdk.Transport.Core\Backend.Sdk.Transport.Core.csproj" />
+    <ProjectReference Include="..\Shared\Backend.Sdk.Runtime\Backend.Sdk.Runtime.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Tests~\Economy\**\*.cs" Link="Economy\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\Tests~\Transport\TransportTestSupport.cs" Link="Transport\TransportTestSupport.cs" />
+    <Compile Include="..\Tests~\Transport\EconomyTransportHeaderTests.cs" Link="Transport\EconomyTransportHeaderTests.cs" />
   </ItemGroup>
 
   <ItemGroup>

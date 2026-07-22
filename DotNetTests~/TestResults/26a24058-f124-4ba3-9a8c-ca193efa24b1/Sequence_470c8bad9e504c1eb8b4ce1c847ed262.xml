@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<TestSequence>
+  <Test Name="BackendSdk.Tests.Economy.EconomyServiceCacheTests.Cancellation_PropagatesCorrectly" DisplayName="Cancellation_PropagatesCorrectly" Source="/Users/mac/backend-sdk/.artifacts/bin/Backend.Sdk.DotNetTests/debug/Backend.Sdk.DotNetTests.dll" Completed="True" />
+  <Test Name="BackendSdk.Tests.Economy.EconomyServiceCacheTests.CancelledCaller_DoesNotCancelSharedLoad" DisplayName="CancelledCaller_DoesNotCancelSharedLoad" Source="/Users/mac/backend-sdk/.artifacts/bin/Backend.Sdk.DotNetTests/debug/Backend.Sdk.DotNetTests.dll" Completed="False" />
+</TestSequence>

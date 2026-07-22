@@ -122,11 +122,13 @@ namespace BackendSdk
         internal void SetSession(PlayerSession value)
         {
             session = value;
+            Backend.Economy.ClearCache();
         }
 
         internal void ClearSession()
         {
             session = null;
+            Backend.Economy.ClearCache();
         }
 
         private static DateTime ParseExpiration(string expiresAt)

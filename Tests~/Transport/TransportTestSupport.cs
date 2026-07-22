@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using BackendSdk;
+using BackendSdk.Internal;
 using BackendSdk.Transport.Core;
 using NUnit.Framework;
 

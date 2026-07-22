@@ -22,6 +22,7 @@ public static class GameBootstrap
         await Backend.Auth.LoginAsync();
 
         await TestProfilesAsync();
+        await TestEconomyAsync();
 
         await Backend.Storage.SetAsync("Save", new MySave { Level = 1 });
         var save = await Backend.Storage.GetAsync<MySave>("Save");
@@ -75,6 +76,19 @@ public static class GameBootstrap
             $"Batch profiles={batch.Profiles.Count}, " +
             $"missing={batch.MissingUserIds.Count}, " +
             $"public={publicProfile.DisplayName}");
+    }
+
+    private static async System.Threading.Tasks.Task TestEconomyAsync()
+    {
+        var state = await Backend.Economy.GetStateAsync();
+
+        Debug.Log(
+            $"Economy gold={state.GetCurrencyBalance("gold")}, " +
+            $"removeAds={state.HasEntitlement("remove_ads")}, " +
+            $"tickets={state.GetEntitlementQuantity("arena_ticket")}");
+
+        var refreshed = await Backend.Economy.RefreshAsync();
+        Debug.Log($"Refreshed economy server time: {refreshed.ServerTime:o}");
     }
 }
 

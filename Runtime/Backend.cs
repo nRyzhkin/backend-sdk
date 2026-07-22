@@ -55,6 +55,11 @@ namespace BackendSdk
         public static InventoryService Inventory { get; } = new InventoryService();
 
         /// <summary>
+        /// Gets the economy service facade.
+        /// </summary>
+        public static EconomyService Economy { get; } = new EconomyService();
+
+        /// <summary>
         /// Gets a value indicating whether the SDK has been initialized.
         /// </summary>
         public static bool IsInitialized => client != null;
@@ -150,6 +155,7 @@ namespace BackendSdk
         {
             client = null;
             Settings = null;
+            Economy.ClearCache();
             Auth.ClearSession();
             UnityWebRequestTransport.TestSendOnceHandler = null;
         }
