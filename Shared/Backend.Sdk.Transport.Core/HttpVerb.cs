@@ -1,4 +1,4 @@
-namespace BackendSdk.Internal
+namespace BackendSdk.Transport.Core
 {
     internal enum HttpVerb
     {

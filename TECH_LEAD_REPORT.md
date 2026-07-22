@@ -14,7 +14,14 @@ Package version: **0.5.0**
 | `Runtime/Profiles/PlayerProfileBatchResult.cs` | Batch lookup result with ordered collections and lookup helpers |
 | `Runtime/Internal/ProfileJson.cs` | Parse/serialize profile wire format |
 | `Runtime/Internal/ReadOnlyJsonRequestBody.cs` | Marker for read-only POST bodies without `X-Request-Id` |
-| `Tests~/Profiles/PlayerProfileJsonTests.cs` | JSON parsing, validation, and serialization unit tests |
+| `Runtime/Internal/TransportRequestBuilder.cs` | Shared request metadata builder for transport + tests |
+| `Runtime/Internal/TransportRequestSnapshot.cs` | Testable HTTP header/body snapshot |
+| `Runtime/Internal/TransportSendInvocation.cs` | Internal transport test hook input |
+| `Runtime/Internal/TransportSendResult.cs` | Internal transport test hook output |
+| `Tests~/Transport/ProfilesTransportHeaderTests.cs` | Profiles X-Request-Id regression tests |
+| `Tests~/Transport/WriteOperationRequestIdMatrixTests.cs` | Cross-module header matrix tests |
+| `Tests~/Transport/TransportRequestBuilderTests.cs` | ReadOnlyJsonRequestBody policy tests |
+| `Tests~/Transport/TransportTestSupport.cs` | Shared recording transport helpers |
 
 ## 2. Files Modified
 
@@ -22,7 +29,10 @@ Package version: **0.5.0**
 |------|--------|
 | `Runtime/Backend.cs` | Added `Backend.Profiles` facade |
 | `Runtime/Internal/BackendClient.cs` | Added anonymous/PUT JSON helpers; batch uses `ReadOnlyJsonRequestBody` |
-| `Runtime/Internal/UnityWebRequestTransport.cs` | Skip `X-Request-Id` for `ReadOnlyJsonRequestBody` |
+| `Runtime/Internal/UnityWebRequestTransport.cs` | `ReadOnlyJsonRequestBody` skip + test hook + shared builder |
+| `Runtime/Backend.cs` | `InitializeForTestsAsync` / `ResetForTests` |
+| `Runtime/Internal/RequestContext.cs` | Idempotency vs correlation note |
+| `Tests~/Profiles/PlayerProfileJsonTests.cs` | JSON parsing, validation, and serialization unit tests |
 | `Runtime/Internal/RemoteConfigJson.cs` | Exposed shared JSON helpers as `internal` |
 | `Runtime/Internal/AnalyticsParametersJson.cs` | Exposed `SerializeJsonValue` and `QuoteJsonString` |
 | `README.md` | Profiles usage, auth matrix, PublicData trust warning |
@@ -246,7 +256,102 @@ Real inventory, currency, purchases, verified achievements, and server rank belo
 - ETag, polling, profile change events
 - New parallel HTTP infrastructure
 
-## 15. Tests
+## 15. Regression Tests (X-Request-Id)
+
+### Shared transport core
+
+Pure request-building logic lives in `Shared/Backend.Sdk.Transport.Core/`:
+
+- `HttpVerb`, `RequestContext`, `JsonRequestBody`, `ReadOnlyJsonRequestBody`
+- `TransportRequestSnapshot`, `TransportRequestBuilder`, `TransportHttpMethods`
+- `ITransportRequestSettings`, `ITransportBodySerializer`
+
+Unity `Backend.Runtime` references `Backend.Sdk.Transport.Core` asmdef. `UnityWebRequestTransport` is a thin adapter: builds `TransportRequestSnapshot`, applies it to `UnityWebRequest`, executes HTTP.
+
+DTO serialization is injected via `TransportRequestBuilder.BodySerializer` (`UnityTransportBodySerializer` in Runtime).
+
+### .NET test project (CI / local without Unity)
+
+```bash
+dotnet restore
+dotnet test
+```
+
+| Project | Role |
+|---------|------|
+| `Shared/Backend.Sdk.Transport.Core/Backend.Sdk.Transport.Core.csproj` | Pure transport policy (netstandard2.1) |
+| `DotNetTests/Backend.Sdk.DotNetTests.csproj` | NUnit tests (net10.0) |
+| `Backend.Sdk.slnx` | Solution entry point |
+
+**Latest run:** 24 passed, 0 failed, 0 skipped (~0.5s).
+
+DotNetTests cover the same header/idempotency rules as Unity transport tests, but against `TransportRequestBuilder` directly (no `UnityWebRequest`).
+
+### Unity tests (retained)
+
+`Tests~/Transport/` remains for future Unity Test Runner discovery. MonoBehaviour / UnityWebRequest E2E was verified manually in Unity Editor; that scope is **not** covered by `dotnet test`.
+
+| File | Coverage |
+|------|----------|
+| `ProfilesTransportHeaderTests.cs` | Profiles service + recording transport |
+| `WriteOperationRequestIdMatrixTests.cs` | Cross-module matrix via services |
+| `TransportRequestBuilderTests.cs` | Policy unit tests |
+| `TransportTestSupport.cs` | Shared recording transport helpers |
+
+Internal Unity-only test hooks (not public API):
+
+- `Backend.InitializeForTestsAsync` / `Backend.ResetForTests`
+- `UnityWebRequestTransport.TestSendOnceHandler`
+
+### Required Profiles tests
+
+1. `GetBatchAsync` — POST, batch URL, `Content-Type`, no `Authorization`, no `X-Request-Id`, native `userIds` JSON, `ReadOnlyJsonRequestBody`
+2. `UpdateMeAsync` — PUT, `Authorization`, `X-Request-Id` present, native `publicData` object
+3. `UpdateMeAsync` retry — same `X-Request-Id` across transient retries
+4. `UpdateMeAsync` separate calls — different `X-Request-Id` values
+5. `GetBatchAsync` retry — both attempts without `X-Request-Id`
+6. `GetMeAsync` — GET + `Authorization`, no `X-Request-Id`
+7. `GetAsync` — GET, no `Authorization`, no `X-Request-Id`
+
+### Header matrix (verified by tests)
+
+| Operation | Verb | Authorization | X-Request-Id |
+|-----------|------|---------------|--------------|
+| `Profiles.GetMeAsync` | GET | Yes | No |
+| `Profiles.UpdateMeAsync` | PUT | Yes | Yes |
+| `Profiles.GetAsync` | GET | No | No |
+| `Profiles.GetBatchAsync` | POST | No | **No** |
+| `Storage.SetAsync` | PUT | Yes | Yes |
+| `Storage.GetAsync` | GET | Yes | No |
+| `Storage.DeleteAsync` | DELETE | Yes | Yes |
+| `Leaderboards.SubmitAsync` | PUT | Yes | Yes |
+| `Leaderboards.GetTopAsync` | GET | Yes* | No |
+| `Analytics.TrackAsync` | POST | Yes | Yes |
+| `RemoteConfig.GetAsync` | GET | No | No |
+
+\*Leaderboards top list is public but transport may still attach `Authorization` when a session exists.
+
+### Correlation ID vs idempotency key (architectural audit)
+
+**Current state:** `RequestContext.RequestId` serves dual duty:
+
+1. Idempotency key (`X-Request-Id` on write operations)
+2. Log correlation suffix (`RequestId=...` in transport debug logs)
+
+Read-only requests (GET, `ReadOnlyJsonRequestBody` POST) have `RequestId = null`, so logs show no correlation ID for batch lookups.
+
+**Assessment:** functionally acceptable for 0.5.0; not a release blocker.
+
+**Follow-up (future improvement, not required now):**
+
+| Concept | Scope | Header |
+|---------|-------|--------|
+| `CorrelationId` | every logical SDK call (reads + writes) | optional `X-Correlation-Id` or log-only |
+| `IdempotencyKey` | write operations only | `X-Request-Id` |
+
+Implementing this split locally would touch transport logging and `RequestContext` without public API changes, but is deferred until a dedicated iteration with tests.
+
+## 16. JSON / Parser Tests
 
 `Tests~/Profiles/PlayerProfileJsonTests.cs` covers:
 
@@ -258,9 +363,7 @@ Real inventory, currency, purchases, verified achievements, and server rank belo
 6. Update/batch request serialization
 7. Local dedupe
 
-No mock HTTP transport was added.
-
-## 16. Unity Verification Checklist
+## 17. Unity Verification Checklist
 
 1. `Backend.Profiles` available after initialization
 2. `GetMeAsync` requires login; lazy create on backend
@@ -271,7 +374,7 @@ No mock HTTP transport was added.
 7. Existing modules still work
 8. Package version `0.5.0`
 
-## 17. Public API Confirmation
+## 18. Public API Confirmation
 
 No breaking changes. Additive API only:
 

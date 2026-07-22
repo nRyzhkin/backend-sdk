@@ -1,7 +1,7 @@
-namespace BackendSdk.Internal
+namespace BackendSdk.Transport.Core
 {
     /// <summary>
-    /// Carries a pre-built JSON payload through the existing transport without re-serializing it.
+    /// Carries a pre-built JSON payload through the transport without re-serializing it.
     /// </summary>
     internal sealed class JsonRequestBody
     {

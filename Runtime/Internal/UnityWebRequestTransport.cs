@@ -2,6 +2,7 @@ using System;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using BackendSdk.Transport.Core;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -9,10 +10,7 @@ namespace BackendSdk.Internal
 {
     internal sealed class UnityWebRequestTransport : IBackendTransport
     {
-        private const string ContentType = "application/json";
-        private const string ApplicationIdHeader = "X-Application-Id";
-        private const string AuthorizationHeader = "Authorization";
-        private const string RequestIdHeader = "X-Request-Id";
+        internal static Func<TransportSendInvocation, Task<TransportSendResult>> TestSendOnceHandler;
 
         private readonly BackendSettings settings;
 
@@ -29,7 +27,7 @@ namespace BackendSdk.Internal
             CancellationToken cancellationToken)
         {
             var maxAttempts = 1 + settings.RetryCount;
-            var context = CreateRequestContext(verb, body);
+            var context = TransportRequestBuilder.CreateRequestContext(verb, body);
 
             BackendException lastTransientError = null;
 
@@ -85,6 +83,31 @@ namespace BackendSdk.Internal
             RequestContext context,
             CancellationToken cancellationToken)
         {
+            if (TestSendOnceHandler != null)
+            {
+                var testResult = await TestSendOnceHandler(new TransportSendInvocation
+                {
+                    Verb = verb,
+                    Path = path,
+                    Body = body,
+                    AuthorizationHeader = authorizationHeader,
+                    Context = context,
+                    Settings = settings
+                }).ConfigureAwait(false);
+
+                if (testResult.ExceptionToThrow != null)
+                {
+                    throw testResult.ExceptionToThrow;
+                }
+
+                if (string.IsNullOrWhiteSpace(testResult.ResponseText))
+                {
+                    return default;
+                }
+
+                return UnityJsonSerializer.Deserialize<TResponse>(testResult.ResponseText);
+            }
+
             using var request = CreateRequest(verb, path, body, authorizationHeader, context);
 
             try
@@ -137,54 +160,31 @@ namespace BackendSdk.Internal
             string authorizationHeader,
             RequestContext context)
         {
-            var request = new UnityWebRequest(BuildUrl(path), MapMethod(verb))
+            var snapshot = TransportRequestBuilder.Build(
+                settings,
+                verb,
+                path,
+                body,
+                authorizationHeader,
+                context);
+
+            var request = new UnityWebRequest(snapshot.Url, snapshot.Method)
             {
                 timeout = settings.TimeoutSeconds,
                 downloadHandler = new DownloadHandlerBuffer()
             };
 
-            request.SetRequestHeader("Accept", ContentType);
-
-            if (!string.IsNullOrWhiteSpace(settings.ApplicationId))
+            foreach (var header in snapshot.Headers)
             {
-                request.SetRequestHeader(ApplicationIdHeader, settings.ApplicationId);
+                request.SetRequestHeader(header.Key, header.Value);
             }
 
-            if (!string.IsNullOrWhiteSpace(authorizationHeader))
+            if (!string.IsNullOrEmpty(snapshot.Payload))
             {
-                request.SetRequestHeader(AuthorizationHeader, authorizationHeader);
-            }
-
-            if (!string.IsNullOrEmpty(context.RequestId))
-            {
-                request.SetRequestHeader(RequestIdHeader, context.RequestId);
-            }
-
-            var payload = verb == HttpVerb.Get || verb == HttpVerb.Delete
-                ? string.Empty
-                : body is JsonRequestBody jsonRequest
-                    ? jsonRequest.Json
-                    : body is ReadOnlyJsonRequestBody readOnlyJsonRequest
-                        ? readOnlyJsonRequest.Json
-                        : UnityJsonSerializer.Serialize(body);
-
-            if (!string.IsNullOrEmpty(payload))
-            {
-                request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(payload));
-                request.SetRequestHeader("Content-Type", ContentType);
+                request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(snapshot.Payload));
             }
 
             return request;
-        }
-
-        private static RequestContext CreateRequestContext(HttpVerb verb, object body)
-        {
-            if (verb == HttpVerb.Get || body is ReadOnlyJsonRequestBody)
-            {
-                return new RequestContext(null);
-            }
-
-            return new RequestContext(Guid.NewGuid().ToString("N"));
         }
 
         private async Task DelayBeforeRetryAsync(CancellationToken cancellationToken)
@@ -232,32 +232,7 @@ namespace BackendSdk.Internal
 
         private string BuildUrl(string path)
         {
-            var baseUrl = (settings.ServerUrl ?? string.Empty).TrimEnd('/');
-            var relativePath = (path ?? string.Empty).TrimStart('/');
-
-            if (string.IsNullOrEmpty(baseUrl))
-            {
-                return relativePath;
-            }
-
-            if (string.IsNullOrEmpty(relativePath))
-            {
-                return baseUrl;
-            }
-
-            return $"{baseUrl}/{relativePath}";
-        }
-
-        private static string MapMethod(HttpVerb verb)
-        {
-            return verb switch
-            {
-                HttpVerb.Get => UnityWebRequest.kHttpVerbGET,
-                HttpVerb.Post => UnityWebRequest.kHttpVerbPOST,
-                HttpVerb.Put => UnityWebRequest.kHttpVerbPUT,
-                HttpVerb.Delete => UnityWebRequest.kHttpVerbDELETE,
-                _ => throw new ArgumentOutOfRangeException(nameof(verb), verb, "Unsupported HTTP verb.")
-            };
+            return TransportRequestBuilder.Build(settings, HttpVerb.Get, path, null, null, new RequestContext(null)).Url;
         }
 
         private static BackendException CreateException(UnityWebRequest request, string responseText, int statusCode)

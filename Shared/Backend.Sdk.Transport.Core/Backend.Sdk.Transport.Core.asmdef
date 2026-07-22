@@ -1,16 +1,14 @@
 {
-  "name": "Backend.Runtime",
-  "rootNamespace": "BackendSdk",
-  "references": [
-    "Backend.Sdk.Transport.Core"
-  ],
+  "name": "Backend.Sdk.Transport.Core",
+  "rootNamespace": "BackendSdk.Transport.Core",
+  "references": [],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
   "overrideReferences": false,
   "precompiledReferences": [],
-  "autoReferenced": true,
+  "autoReferenced": false,
   "defineConstraints": [],
   "versionDefines": [],
-  "noEngineReferences": false
+  "noEngineReferences": true
 }

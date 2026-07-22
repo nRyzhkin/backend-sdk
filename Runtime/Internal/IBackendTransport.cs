@@ -1,5 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
+using BackendSdk.Transport.Core;
 
 namespace BackendSdk.Internal
 {

@@ -1,4 +1,5 @@
 using System;
+using BackendSdk.Transport.Core;
 
 namespace BackendSdk
 {
@@ -6,7 +7,7 @@ namespace BackendSdk
     /// Represents the immutable configuration currently used by the Backend SDK.
     /// </summary>
     [Serializable]
-    public sealed class BackendSettings
+    public sealed class BackendSettings : ITransportRequestSettings
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="BackendSettings"/> class.

@@ -337,3 +337,14 @@ Samples~/
 - `Documentation~/Architecture.md`
 - `Samples~/GettingStarted/README.md`
 - `TECH_LEAD_REPORT.md`
+
+## .NET Transport Tests
+
+Pure transport/header regression tests run without Unity:
+
+```bash
+dotnet restore
+dotnet test
+```
+
+See `DotNetTests/` and `Shared/Backend.Sdk.Transport.Core/`.

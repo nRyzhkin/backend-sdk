@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using BackendSdk.Internal;
+using BackendSdk.Transport.Core;
 
 namespace BackendSdk
 {
@@ -93,6 +94,7 @@ namespace BackendSdk
 
                 var resolvedOptions = options ?? new BackendOptions();
                 Settings = BackendSettings.FromOptions(resolvedOptions);
+                TransportRequestBuilder.BodySerializer = UnityTransportBodySerializer.Instance;
 
                 if (string.IsNullOrWhiteSpace(Settings.ServerUrl))
                 {
@@ -120,6 +122,36 @@ namespace BackendSdk
             }
 
             return client;
+        }
+
+        internal static async Task InitializeForTestsAsync(
+            BackendOptions options,
+            IBackendTransport transport,
+            CancellationToken cancellationToken = default)
+        {
+            await InitializeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+            try
+            {
+                client = null;
+                var resolvedOptions = options ?? new BackendOptions();
+                Settings = BackendSettings.FromOptions(resolvedOptions);
+                TransportRequestBuilder.BodySerializer = UnityTransportBodySerializer.Instance;
+                client = new BackendClient(Settings, transport);
+                await client.InitializeAsync(cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                InitializeGate.Release();
+            }
+        }
+
+        internal static void ResetForTests()
+        {
+            client = null;
+            Settings = null;
+            Auth.ClearSession();
+            UnityWebRequestTransport.TestSendOnceHandler = null;
         }
     }
 }
