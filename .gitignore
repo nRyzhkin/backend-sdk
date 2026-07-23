@@ -21,3 +21,5 @@ Icon
 [Bb]in/
 [Oo]bj/
 .artifacts/
+TestResults/
+*.dmp
