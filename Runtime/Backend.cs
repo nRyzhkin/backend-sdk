@@ -60,6 +60,11 @@ namespace BackendSdk
         public static EconomyService Economy { get; } = new EconomyService();
 
         /// <summary>
+        /// Gets the jobs service facade.
+        /// </summary>
+        public static JobsService Jobs { get; } = new JobsService();
+
+        /// <summary>
         /// Gets a value indicating whether the SDK has been initialized.
         /// </summary>
         public static bool IsInitialized => client != null;
