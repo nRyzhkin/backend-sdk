@@ -17,6 +17,7 @@ namespace BackendSdk.Tests.Jobs
               ""bonusTickets"": 1,
               ""freeTicketMax"": 5,
               ""freeTicketsFullAtUtc"": ""2026-08-10T12:00:00Z"",
+              ""nextFreeTicketAtUtc"": ""2026-08-10T11:30:00Z"",
               ""rewardPreview"": 89000,
               ""hasActiveRun"": false,
               ""canStart"": true,
@@ -38,6 +39,7 @@ namespace BackendSdk.Tests.Jobs
             Assert.AreEqual(1, offer.BonusTickets);
             Assert.AreEqual(5, offer.FreeTicketMax);
             Assert.IsNotNull(offer.FreeTicketsFullAtUtc);
+            Assert.IsNotNull(offer.NextFreeTicketAtUtc);
             Assert.AreEqual(89000L, offer.RewardPreview);
             Assert.IsFalse(offer.HasActiveRun);
             Assert.IsTrue(offer.CanStart);

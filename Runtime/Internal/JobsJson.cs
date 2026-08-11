@@ -36,6 +36,7 @@ namespace BackendSdk.Internal
                 ParseRequiredInt(trimmed, "bonusTickets"),
                 ParseRequiredInt(trimmed, "freeTicketMax"),
                 ParseOptionalUtcDateTime(trimmed, "freeTicketsFullAtUtc"),
+                ParseOptionalUtcDateTime(trimmed, "nextFreeTicketAtUtc"),
                 ParseRequiredLong(trimmed, "rewardPreview"),
                 ParseRequiredBool(trimmed, "hasActiveRun"),
                 ParseRequiredBool(trimmed, "canStart"),
@@ -144,7 +145,11 @@ namespace BackendSdk.Internal
                 throw CreateDeserializationException($"Invalid DateTime in '{propertyName}': '{value}'.");
             }
 
-            return parsed.ToUniversalTime();
+            // Unspecified timestamps from the jobs API are UTC wall-clock values.
+            // ToUniversalTime() would incorrectly shift them on non-UTC clients.
+            return parsed.Kind == DateTimeKind.Unspecified
+                ? DateTime.SpecifyKind(parsed, DateTimeKind.Utc)
+                : parsed.ToUniversalTime();
         }
 
         private static BackendException CreateDeserializationException(string message)

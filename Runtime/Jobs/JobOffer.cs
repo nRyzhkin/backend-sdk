@@ -17,6 +17,7 @@ namespace BackendSdk
             int bonusTickets,
             int freeTicketMax,
             DateTime? freeTicketsFullAtUtc,
+            DateTime? nextFreeTicketAtUtc,
             long rewardPreview,
             bool hasActiveRun,
             bool canStart,
@@ -32,6 +33,7 @@ namespace BackendSdk
             BonusTickets = bonusTickets;
             FreeTicketMax = freeTicketMax;
             FreeTicketsFullAtUtc = freeTicketsFullAtUtc;
+            NextFreeTicketAtUtc = nextFreeTicketAtUtc;
             RewardPreview = rewardPreview;
             HasActiveRun = hasActiveRun;
             CanStart = canStart;
@@ -66,7 +68,10 @@ namespace BackendSdk
         /// <summary>UTC when free tickets are expected to be full, if regenerating.</summary>
         public DateTime? FreeTicketsFullAtUtc { get; }
 
-        /// <summary>Coins preview for completing at the current level.</summary>
+        /// <summary>UTC when the next free ticket regenerates (null at cap).</summary>
+        public DateTime? NextFreeTicketAtUtc { get; }
+
+        /// <summary>Coins preview for the next completion.</summary>
         public long RewardPreview { get; }
 
         /// <summary>True when this job already has an unfinished run.</summary>
