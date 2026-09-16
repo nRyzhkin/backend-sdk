@@ -56,6 +56,7 @@ namespace BackendSdk.Tests.Transport
             };
 
             await Backend.InitializeForTestsAsync(options, transport).ConfigureAwait(false);
+            Backend.Auth.EditorLogin = null;
         }
 
         internal static void Authenticate()

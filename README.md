@@ -103,10 +103,11 @@ var batch = await Backend.Profiles.GetBatchAsync(new[] { me.UserId, Guid.NewGuid
 ## Authentication Flow
 
 1. Game calls `Backend.Auth.EnsureSessionAsync(platform)` (or Editor `LoginAsync()` in development mode).
-2. **Guest accounts are created only by `POST /v1/auth/guest`.** The server returns `guestKey`; the SDK stores it in PlayerPrefs (`BackendSdk.GuestKey.{applicationId}`).
-3. Later launches restore the same player with `POST /v1/auth/login` `{ provider: "guest", externalId: guestKey }`. Inventing a guest id on the client is rejected (`guest_unknown`).
-4. When a platform id appears, `EnsureSessionAsync` logs in the stored guest then `POST /v1/auth/link` so progress stays on one user.
-5. `PlayerSession` holds the access token. Later requests send `Authorization: Bearer <AccessToken>`.
+2. **Guest accounts are created only by `POST /v1/auth/guest`.** The server returns `guestKey`. Player/WebGL builds store that secret in PlayerPrefs (`BackendSdk.GuestKey.{applicationId}`) so the next launch can call `POST /v1/auth/login`. The account itself lives on the server.
+3. **Editor Play** does not use that hidden guest key. Project Settings → Backend → **Editor Account** is `UserSettings/BackendSdkEditorAccount.json` (public player id). Empty field creates a guest; after login the public id is written back and the settings field refreshes when Play stops.
+4. Inventing a guest id on the client is rejected (`guest_unknown`).
+5. When a platform id appears, `EnsureSessionAsync` logs in the stored guest then `POST /v1/auth/link` so progress stays on one user.
+6. `PlayerSession` holds the access token. Later requests send `Authorization: Bearer <AccessToken>`.
 
 ```csharp
 await Backend.InitializeAsync();

@@ -163,7 +163,11 @@ namespace BackendSdk
             Economy.ClearCache();
             Auth.ClearSession();
             Auth.GuestCredentials = new PlayerPrefsGuestCredentialStore();
-            Auth.EditorLogin = new PlayerPrefsGuestCredentialStore(PlayerPrefsGuestCredentialStore.EditorLoginPrefix);
+#if UNITY_EDITOR && !BACKEND_SDK_DOTNET
+            Auth.EditorLogin = new EditorAccountFileStore();
+#else
+            Auth.EditorLogin = null;
+#endif
             UnityWebRequestTransport.TestSendOnceHandler = null;
         }
     }

@@ -19,10 +19,14 @@ namespace BackendSdk
         public IGuestCredentialStore GuestCredentials { get; set; } = new PlayerPrefsGuestCredentialStore();
 
         /// <summary>
-        /// Editor-only account field (public user id or guest key). Separate from the guest key store.
+        /// Editor-only visible account (public user id). Null in player builds and tests.
         /// </summary>
-        public IGuestCredentialStore EditorLogin { get; set; } =
-            new PlayerPrefsGuestCredentialStore(PlayerPrefsGuestCredentialStore.EditorLoginPrefix);
+#if UNITY_EDITOR && !BACKEND_SDK_DOTNET
+        public IGuestCredentialStore EditorLogin { get; set; } = new EditorAccountFileStore();
+#else
+        public IGuestCredentialStore EditorLogin { get; set; }
+#endif
+
 
         /// <inheritdoc />
         public PlayerSession Session => session;
@@ -188,8 +192,12 @@ namespace BackendSdk
             var applicationId = Backend.Settings?.ApplicationId ?? string.Empty;
 
 #if UNITY_EDITOR && !BACKEND_SDK_DOTNET
-            if (!hasPlatform && await TryEditorLoginAsync(applicationId, cancellationToken))
+            if (!hasPlatform && EditorLogin != null)
             {
+                if (await TryEditorLoginAsync(applicationId, cancellationToken))
+                    return RequireSession();
+
+                await CreateGuestAsync(cancellationToken);
                 return RequireSession();
             }
 #endif
@@ -292,18 +300,20 @@ namespace BackendSdk
             SetSession(playerSession);
 
             var applicationId = Backend.Settings?.ApplicationId ?? string.Empty;
+#if UNITY_EDITOR && !BACKEND_SDK_DOTNET
+            if (EditorLogin != null)
+            {
+                if (!string.IsNullOrWhiteSpace(playerSession.PlayerId))
+                    EditorLogin.Save(applicationId, playerSession.PlayerId);
+                GuestCredentials?.Clear(applicationId);
+            }
+            else
+#endif
             if (string.Equals(provider, AuthProviders.Guest, StringComparison.OrdinalIgnoreCase) &&
                 !string.IsNullOrWhiteSpace(externalId))
             {
                 GuestCredentials?.Save(applicationId, externalId);
             }
-
-#if UNITY_EDITOR && !BACKEND_SDK_DOTNET
-            if (!string.IsNullOrWhiteSpace(playerSession.PlayerId))
-            {
-                EditorLogin?.Save(applicationId, playerSession.PlayerId);
-            }
-#endif
 
             return new LoginResult(playerSession, parsed.GuestKey ?? GuestKeyFromSession(playerSession));
         }
@@ -311,18 +321,30 @@ namespace BackendSdk
 #if UNITY_EDITOR && !BACKEND_SDK_DOTNET
         async Task<bool> TryEditorLoginAsync(string applicationId, CancellationToken cancellationToken)
         {
-            var editorStore = EditorLogin ?? new PlayerPrefsGuestCredentialStore(
-                PlayerPrefsGuestCredentialStore.EditorLoginPrefix);
+            var editorStore = EditorLogin;
+            if (editorStore == null)
+                return false;
+
             if (!editorStore.TryGet(applicationId, out var raw) || string.IsNullOrWhiteSpace(raw))
             {
-                return false;
+                var leftoverEditor = new PlayerPrefsGuestCredentialStore(
+                    PlayerPrefsGuestCredentialStore.EditorLoginPrefix);
+                leftoverEditor.TryGet(applicationId, out raw);
+                leftoverEditor.Clear(applicationId);
+                if (string.IsNullOrWhiteSpace(raw))
+                {
+                    var leftoverGuests = GuestCredentials ?? new PlayerPrefsGuestCredentialStore();
+                    leftoverGuests.TryGet(applicationId, out raw);
+                    leftoverGuests.Clear(applicationId);
+                }
+
+                if (string.IsNullOrWhiteSpace(raw))
+                    return false;
             }
 
             raw = raw.Trim();
             if (Guid.TryParse(raw, out _))
-            {
                 await LoginByUserIdAsync(raw, cancellationToken);
-            }
             else
             {
                 await LoginAsync(
@@ -334,6 +356,7 @@ namespace BackendSdk
                     cancellationToken);
             }
 
+            GuestCredentials?.Clear(applicationId);
             RememberEditorLogin(applicationId);
             return true;
         }
@@ -345,8 +368,7 @@ namespace BackendSdk
                 return;
             }
 
-            var editorStore = EditorLogin ?? new PlayerPrefsGuestCredentialStore(
-                PlayerPrefsGuestCredentialStore.EditorLoginPrefix);
+            var editorStore = EditorLogin ?? new EditorAccountFileStore();
             editorStore.Save(applicationId, Session.PlayerId);
         }
 #endif
