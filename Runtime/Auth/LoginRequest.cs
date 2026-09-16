@@ -17,5 +17,10 @@ namespace BackendSdk
         /// The external player identifier provided by the authentication provider.
         /// </summary>
         public string ExternalId = string.Empty;
+
+        /// <summary>
+        /// Optional display name from the platform (or a chosen nick). Applied when the profile is still a placeholder.
+        /// </summary>
+        public string DisplayName = string.Empty;
     }
 }

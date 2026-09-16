@@ -53,10 +53,36 @@ namespace BackendSdk.Internal
             return new ParsedLoginResponse(userId, accessToken, expiresAt, provider, guestKey);
         }
 
-        internal static string BuildLoginRequest(string provider, string externalId)
+        internal static string BuildLoginRequest(
+            string provider,
+            string externalId,
+            string displayName = null,
+            string applicationId = null)
         {
             return "{\"provider\":" + Quote(provider ?? string.Empty) +
-                   ",\"externalId\":" + Quote(externalId ?? string.Empty) + "}";
+                   ",\"externalId\":" + Quote(externalId ?? string.Empty) +
+                   OptionalJsonField("displayName", displayName) +
+                   OptionalJsonField("applicationId", applicationId) + "}";
+        }
+
+        internal static string BuildGuestCreateRequest(string applicationId, string displayName)
+        {
+            var json = "{";
+            var comma = false;
+            if (!string.IsNullOrWhiteSpace(applicationId))
+            {
+                json += "\"applicationId\":" + Quote(applicationId.Trim());
+                comma = true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(displayName))
+            {
+                if (comma)
+                    json += ",";
+                json += "\"displayName\":" + Quote(displayName.Trim());
+            }
+
+            return json + "}";
         }
 
         internal static string BuildImpersonateRequest(string userId)
@@ -74,6 +100,13 @@ namespace BackendSdk.Internal
             return "\"" + value
                 .Replace("\\", "\\\\")
                 .Replace("\"", "\\\"") + "\"";
+        }
+
+        static string OptionalJsonField(string name, string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+            return "," + "\"" + name + "\":" + Quote(value.Trim());
         }
 
         static string ReadOptionalString(string json, string property)

@@ -13,7 +13,8 @@ The format is based on Keep a Changelog, and this package follows Semantic Versi
 - `AuthProviders.Guest` and `LoginResult.GuestKey`.
 - `PlayerProfile.PublicDataJson` is now public for round-trip profile updates.
 - `Auth.LoginByUserIdAsync` and `POST /v1/auth/impersonate` for Editor login by public player id (server flag `Auth:AllowPublicIdLogin`).
-- Project Settings → Backend **Editor Account** field stored in `UserSettings/BackendSdkEditorAccount.json` (this machine only). Editor Play no longer restores a hidden PlayerPrefs guest key.
+- Linking a platform identity to a guest removes the guest credential. If that identity already belongs to another user, guest storage/profiles are merged into that user and the guest account is deleted.
+- Login/guest/link accept optional `displayName` and `applicationId` so a placeholder nick (`Player` / `Guest-…`) is filled in at auth time.
 
 ### Changed
 

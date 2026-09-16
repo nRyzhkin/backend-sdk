@@ -172,9 +172,13 @@ namespace BackendSdk
 
         private static void ValidateDisplayName(string displayName)
         {
-            if (string.IsNullOrWhiteSpace(displayName))
+            if (!DisplayNameRules.TryNormalize(displayName, out _, out var code))
             {
-                throw new ArgumentException("Display name is required.", nameof(displayName));
+                throw new ArgumentException(
+                    code == DisplayNameRules.Profanity
+                        ? "Display name is not allowed."
+                        : "Display name is invalid.",
+                    nameof(displayName));
             }
         }
 

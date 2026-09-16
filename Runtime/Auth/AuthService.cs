@@ -85,7 +85,11 @@ namespace BackendSdk
             }
 
             var client = Backend.ClientOrThrow();
-            var json = AuthJson.BuildLoginRequest(request.Provider.Trim(), request.ExternalId.Trim());
+            var json = AuthJson.BuildLoginRequest(
+                request.Provider.Trim(),
+                request.ExternalId.Trim(),
+                request.DisplayName,
+                Backend.Settings?.ApplicationId);
             var responseJson = await client.PostJsonAnonymousAsync(
                 "v1/auth/login",
                 json,
@@ -103,7 +107,7 @@ namespace BackendSdk
             var client = Backend.ClientOrThrow();
             var responseJson = await client.PostJsonAnonymousAsync(
                 "v1/auth/guest",
-                "{}",
+                AuthJson.BuildGuestCreateRequest(Backend.Settings?.ApplicationId, null),
                 cancellationToken);
 
             return ApplyLoginResponse(responseJson, AuthProviders.Guest, null);
@@ -149,7 +153,11 @@ namespace BackendSdk
             }
 
             var client = Backend.ClientOrThrow();
-            var json = AuthJson.BuildLoginRequest(request.Provider.Trim(), request.ExternalId.Trim());
+            var json = AuthJson.BuildLoginRequest(
+                request.Provider.Trim(),
+                request.ExternalId.Trim(),
+                request.DisplayName,
+                Backend.Settings?.ApplicationId);
             var responseJson = await client.PostJsonRawAsync(
                 "v1/auth/link",
                 json,
@@ -313,6 +321,10 @@ namespace BackendSdk
                 !string.IsNullOrWhiteSpace(externalId))
             {
                 GuestCredentials?.Save(applicationId, externalId);
+            }
+            else
+            {
+                GuestCredentials?.Clear(applicationId);
             }
 
             return new LoginResult(playerSession, parsed.GuestKey ?? GuestKeyFromSession(playerSession));
