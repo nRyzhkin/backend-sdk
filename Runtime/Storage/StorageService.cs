@@ -29,7 +29,7 @@ namespace BackendSdk
             await client.PutAsync<StorageValueDto, StorageValueDto>(
                 BuildPath(client, key),
                 body,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken);
         }
 
         /// <inheritdoc />
@@ -41,7 +41,7 @@ namespace BackendSdk
 
             var response = await client.GetAsync<StorageValueDto>(
                 BuildPath(client, key),
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken);
 
             return DeserializeValue<T>(response?.value);
         }
@@ -53,7 +53,7 @@ namespace BackendSdk
             cancellationToken.ThrowIfCancellationRequested();
             ValidateKey(key);
 
-            await client.DeleteAsync(BuildPath(client, key), cancellationToken).ConfigureAwait(false);
+            await client.DeleteAsync(BuildPath(client, key), cancellationToken);
         }
 
         private static BackendClient GetAuthenticatedClient()

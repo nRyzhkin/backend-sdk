@@ -8,7 +8,8 @@ namespace BackendSdk.Internal
     {
         /// <summary>
         /// Completes when the UnityWebRequest finishes on the player loop.
-        /// Callers must await without ConfigureAwait(false) so Unity API access stays on the main thread.
+        /// Do not use ConfigureAwait(false): Unity and WebGL have no worker thread pool;
+        /// PlayerPrefs / UnityWebRequest must stay on the main thread.
         /// </summary>
         internal static Task SendWebRequestAsync(this UnityWebRequest request, CancellationToken cancellationToken)
         {

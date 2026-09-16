@@ -47,6 +47,11 @@ namespace BackendSdk
         public string AvatarId { get; }
 
         /// <summary>
+        /// Gets the raw public-data JSON object. Prefer <see cref="GetPublicData{T}"/> for typed access.
+        /// </summary>
+        public string PublicDataJson { get; }
+
+        /// <summary>
         /// Gets when the profile was created (UTC).
         /// </summary>
         public DateTime CreatedAt { get; }
@@ -55,8 +60,6 @@ namespace BackendSdk
         /// Gets when the profile was last updated (UTC).
         /// </summary>
         public DateTime UpdatedAt { get; }
-
-        internal string PublicDataJson { get; }
 
         /// <summary>
         /// Deserializes the client-controlled public data payload to the requested type.

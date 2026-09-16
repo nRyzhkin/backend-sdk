@@ -17,6 +17,7 @@
   <ItemGroup>
     <Compile Include="..\Tests~\Economy\**\*.cs" Link="Economy\%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="..\Tests~\Jobs\**\*.cs" Link="Jobs\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\Tests~\Auth\**\*.cs" Link="Auth\%(RecursiveDir)%(Filename)%(Extension)" />
     <Compile Include="..\Tests~\Transport\TransportTestSupport.cs" Link="Transport\TransportTestSupport.cs" />
     <Compile Include="..\Tests~\Transport\EconomyTransportHeaderTests.cs" Link="Transport\EconomyTransportHeaderTests.cs" />
   </ItemGroup>

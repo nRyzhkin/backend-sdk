@@ -111,10 +111,10 @@ namespace BackendSdk.Internal
 
         internal Task<string> PostJsonAnonymousAsync(string path, string jsonBody, CancellationToken cancellationToken = default)
         {
-            return transport.SendAsync<ReadOnlyJsonRequestBody, string>(
+            return transport.SendAsync<JsonRequestBody, string>(
                 HttpVerb.Post,
                 path,
-                new ReadOnlyJsonRequestBody(jsonBody),
+                new JsonRequestBody(jsonBody),
                 null,
                 cancellationToken);
         }

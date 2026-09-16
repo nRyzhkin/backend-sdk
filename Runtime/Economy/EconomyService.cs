@@ -35,7 +35,7 @@ namespace BackendSdk
         /// <inheritdoc />
         public async Task<EconomyDefinitions> GetDefinitionsAsync(CancellationToken cancellationToken = default)
         {
-            var snapshot = await LoadSnapshotAsync(forceRefresh: false, cancellationToken).ConfigureAwait(false);
+            var snapshot = await LoadSnapshotAsync(forceRefresh: false, cancellationToken);
             return snapshot.Definitions;
         }
 
@@ -44,7 +44,7 @@ namespace BackendSdk
             bool forceRefresh = false,
             CancellationToken cancellationToken = default)
         {
-            var snapshot = await LoadSnapshotAsync(forceRefresh, cancellationToken).ConfigureAwait(false);
+            var snapshot = await LoadSnapshotAsync(forceRefresh, cancellationToken);
             return snapshot.State;
         }
 
@@ -76,7 +76,7 @@ namespace BackendSdk
                 return new EconomyJson.EconomySnapshot(cachedState, cachedDefinitions);
             }
 
-            await loadGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            await loadGate.WaitAsync(cancellationToken);
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -93,7 +93,7 @@ namespace BackendSdk
                 var client = Backend.ClientOrThrow();
                 var responseJson = await client.GetRawAsync(
                     BuildMePath(client),
-                    CancellationToken.None).ConfigureAwait(false);
+                    CancellationToken.None);
 
                 var snapshot = EconomyJson.ParseSnapshot(responseJson);
 

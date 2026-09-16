@@ -21,7 +21,7 @@ namespace BackendSdk
             var client = GetAuthenticatedClient();
             cancellationToken.ThrowIfCancellationRequested();
 
-            var responseJson = await client.GetRawAsync(BuildBasePath(client), cancellationToken).ConfigureAwait(false);
+            var responseJson = await client.GetRawAsync(BuildBasePath(client), cancellationToken);
             return JobsJson.ParseBatch(responseJson);
         }
 
@@ -32,8 +32,7 @@ namespace BackendSdk
             cancellationToken.ThrowIfCancellationRequested();
             ValidateJobId(jobId);
 
-            var responseJson = await client.GetRawAsync(BuildJobPath(client, jobId), cancellationToken)
-                .ConfigureAwait(false);
+            var responseJson = await client.GetRawAsync(BuildJobPath(client, jobId), cancellationToken);
             return JobsJson.ParseOffer(responseJson);
         }
 
@@ -47,8 +46,7 @@ namespace BackendSdk
             var responseJson = await client.PostJsonRawAsync(
                     $"{BuildJobPath(client, jobId)}/start",
                     "{}",
-                    cancellationToken)
-                .ConfigureAwait(false);
+                    cancellationToken);
             return JobsJson.ParseStart(responseJson);
         }
 
@@ -62,8 +60,7 @@ namespace BackendSdk
             var responseJson = await client.PostJsonRawAsync(
                     $"{BuildJobPath(client, jobId)}/complete",
                     "{}",
-                    cancellationToken)
-                .ConfigureAwait(false);
+                    cancellationToken);
             return JobsJson.ParseComplete(responseJson);
         }
 

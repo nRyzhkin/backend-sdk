@@ -81,7 +81,50 @@ namespace BackendSdk.Editor
                     rootElement.Add(retryDelayField);
 
                     rootElement.Add(new HelpBox(
-                        "Development mode allows Backend.Auth.LoginAsync() to authenticate using the credentials below while running in the Unity Editor.",
+                        "Editor account is stored on this machine only. Empty + Play creates a new guest and fills the public player id. " +
+                        "Paste any player's public id (the GUID from logs / DB) to log in as them. " +
+                        "A guest key also works. Clear the field for a new guest. Requires Auth:AllowPublicIdLogin on the server (on in Development).",
+                        HelpBoxMessageType.Info));
+
+                    var editorStore = new PlayerPrefsGuestCredentialStore(
+                        PlayerPrefsGuestCredentialStore.EditorLoginPrefix);
+                    var guestStore = new PlayerPrefsGuestCredentialStore();
+                    editorStore.TryGet(settings.ApplicationId, out var storedAccount);
+                    var editorAccountField = CreateTextField(
+                        "Editor Account",
+                        storedAccount ?? string.Empty,
+                        value => SaveEditorAccount(editorStore, guestStore, value));
+                    rootElement.Add(editorAccountField);
+
+                    var buttons = new VisualElement
+                    {
+                        style = { flexDirection = FlexDirection.Row, marginTop = 4, marginBottom = 8 }
+                    };
+                    buttons.Add(new Button(() =>
+                    {
+                        editorStore.TryGet(BackendProjectSettings.Load().ApplicationId, out var latest);
+                        editorAccountField.SetValueWithoutNotify(latest ?? string.Empty);
+                    })
+                    {
+                        text = "Reload"
+                    });
+                    buttons.Add(new Button(() =>
+                    {
+                        SaveEditorAccount(editorStore, guestStore, string.Empty);
+                        editorAccountField.SetValueWithoutNotify(string.Empty);
+                    })
+                    {
+                        text = "New guest"
+                    });
+                    rootElement.Add(buttons);
+
+                    var advanced = new Foldout
+                    {
+                        text = "Advanced (legacy development login)",
+                        value = false
+                    };
+                    advanced.Add(new HelpBox(
+                        "Optional fake platform identity for Backend.Auth.LoginAsync() in the Editor. WormsBase Play Mode does not use this.",
                         HelpBoxMessageType.Info));
 
                     var developmentProviderField = CreateTextField(
@@ -115,9 +158,10 @@ namespace BackendSdk.Editor
                         developmentExternalIdField.SetEnabled(evt.newValue);
                         settings.Save();
                     });
-                    rootElement.Add(developmentModeField);
-                    rootElement.Add(developmentProviderField);
-                    rootElement.Add(developmentExternalIdField);
+                    advanced.Add(developmentModeField);
+                    advanced.Add(developmentProviderField);
+                    advanced.Add(developmentExternalIdField);
+                    rootElement.Add(advanced);
                 },
                 keywords = new System.Collections.Generic.HashSet<string>(new[]
                 {
@@ -131,9 +175,27 @@ namespace BackendSdk.Editor
                     "development",
                     "provider",
                     "external id",
+                    "guest",
+                    "editor account",
                     "authentication"
                 })
             };
+        }
+
+        static void SaveEditorAccount(
+            PlayerPrefsGuestCredentialStore editorStore,
+            PlayerPrefsGuestCredentialStore guestStore,
+            string value)
+        {
+            var applicationId = BackendProjectSettings.Load().ApplicationId;
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                editorStore.Clear(applicationId);
+                guestStore.Clear(applicationId);
+                return;
+            }
+
+            editorStore.Save(applicationId, value);
         }
 
         private static TextField CreateTextField(string label, string value, System.Action<string> onChanged)

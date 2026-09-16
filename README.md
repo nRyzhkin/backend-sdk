@@ -20,7 +20,7 @@ Game code talks to services. It never thinks about HTTP, JSON, JWT, URLs, or App
 using BackendSdk;
 
 await Backend.InitializeAsync();
-await Backend.Auth.LoginAsync();
+await Backend.Auth.EnsureSessionAsync(); // or LoginAsync() in the Editor
 await Backend.Storage.SetAsync("Save", save);
 await Backend.Leaderboards.SubmitAsync("highscore", 1200, SortMode.Descending);
 await Backend.Analytics.TrackAsync("LevelStarted", new { level = 5, difficulty = "Hard" });
@@ -51,15 +51,12 @@ var cdnUrl =
 var maintenance =
     await Backend.RemoteConfig.GetAsync<bool>("maintenance");
 
-// Editor development flow
-await Backend.Auth.LoginAsync();
-
-// Or explicit provider credentials from platform SDKs
-await Backend.Auth.LoginAsync(new LoginRequest
-{
-    Provider = "crazygames",
-    ExternalId = crazyGamesUserId
-});
+#if UNITY_EDITOR
+if (Backend.Settings.DevelopmentMode)
+    await Backend.Auth.LoginAsync();
+else
+#endif
+    await Backend.Auth.EnsureSessionAsync(platformRequestOrNull);
 
 await Backend.Storage.SetAsync("Save", save);
 var save = await Backend.Storage.GetAsync<MySave>("Save");
@@ -105,15 +102,24 @@ var batch = await Backend.Profiles.GetBatchAsync(new[] { me.UserId, Guid.NewGuid
 
 ## Authentication Flow
 
-1. Game calls `Backend.Auth.LoginAsync()` or `LoginAsync(LoginRequest)`.
-2. SDK posts credentials to the backend.
-3. `AuthService` stores `PlayerSession` with access token and expiration.
-4. Later requests automatically include `Authorization: Bearer <AccessToken>`.
-5. Game code never passes tokens.
+1. Game calls `Backend.Auth.EnsureSessionAsync(platform)` (or Editor `LoginAsync()` in development mode).
+2. **Guest accounts are created only by `POST /v1/auth/guest`.** The server returns `guestKey`; the SDK stores it in PlayerPrefs (`BackendSdk.GuestKey.{applicationId}`).
+3. Later launches restore the same player with `POST /v1/auth/login` `{ provider: "guest", externalId: guestKey }`. Inventing a guest id on the client is rejected (`guest_unknown`).
+4. When a platform id appears, `EnsureSessionAsync` logs in the stored guest then `POST /v1/auth/link` so progress stays on one user.
+5. `PlayerSession` holds the access token. Later requests send `Authorization: Bearer <AccessToken>`.
 
-`Backend.Auth.Session` is read-only. Only the SDK can create or clear the session.
+```csharp
+await Backend.InitializeAsync();
 
-`LogoutAsync()` clears the local session.
+#if UNITY_EDITOR
+if (Backend.Settings.DevelopmentMode)
+    await Backend.Auth.LoginAsync();
+else
+#endif
+    await Backend.Auth.EnsureSessionAsync(platformRequestOrNull);
+```
+
+`LogoutAsync()` clears the local JWT. It does **not** delete the guest key.
 
 ## Automatic Token Injection
 
@@ -153,11 +159,12 @@ await Backend.Leaderboards.SubmitAsync("highscore", 1500, SortMode.Descending);
 
 ### Auth
 
-- `LoginAsync()`
-- `LoginAsync(LoginRequest)`
+- `EnsureSessionAsync(platform = null)`
+- `CreateGuestAsync()`
+- `LoginAsync()` / `LoginAsync(LoginRequest)`
+- `LinkAsync(LoginRequest)`
 - `LogoutAsync()`
-- `Session`
-- `IsAuthenticated`
+- `Session` / `IsAuthenticated` / `GuestCredentials`
 
 ### Storage
 

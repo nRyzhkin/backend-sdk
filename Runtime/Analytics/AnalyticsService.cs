@@ -30,7 +30,7 @@ namespace BackendSdk
             await client.PostJsonAsync(
                 BuildPath(client),
                 body,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken);
         }
 
         private static BackendClient GetAuthenticatedClient()

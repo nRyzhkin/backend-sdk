@@ -93,7 +93,7 @@ namespace BackendSdk.Internal
                     AuthorizationHeader = authorizationHeader,
                     Context = context,
                     Settings = settings
-                }).ConfigureAwait(false);
+                });
 
                 if (testResult.ExceptionToThrow != null)
                 {

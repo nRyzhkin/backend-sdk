@@ -32,7 +32,7 @@ namespace BackendSdk
             var client = GetAuthenticatedClient();
             cancellationToken.ThrowIfCancellationRequested();
 
-            var responseJson = await client.GetRawAsync(BuildMePath(client), cancellationToken).ConfigureAwait(false);
+            var responseJson = await client.GetRawAsync(BuildMePath(client), cancellationToken);
             return ProfileJson.ParseProfile(responseJson);
         }
 
@@ -48,7 +48,7 @@ namespace BackendSdk
             ValidateDisplayName(displayName);
 
             var body = ProfileJson.BuildUpdateRequest(displayName, avatarId, publicData);
-            var responseJson = await client.PutJsonAsync(BuildMePath(client), body, cancellationToken).ConfigureAwait(false);
+            var responseJson = await client.PutJsonAsync(BuildMePath(client), body, cancellationToken);
             return ProfileJson.ParseProfile(responseJson);
         }
 
@@ -64,7 +64,7 @@ namespace BackendSdk
             ValidateDisplayName(displayName);
 
             var body = ProfileJson.BuildUpdateRequest(displayName, avatarId, publicDataJson);
-            var responseJson = await client.PutJsonAsync(BuildMePath(client), body, cancellationToken).ConfigureAwait(false);
+            var responseJson = await client.PutJsonAsync(BuildMePath(client), body, cancellationToken);
             return ProfileJson.ParseProfile(responseJson);
         }
 
@@ -78,7 +78,7 @@ namespace BackendSdk
             var client = Backend.ClientOrThrow();
             var responseJson = await client.GetRawAnonymousAsync(
                 BuildPublicPath(client, userId),
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken);
 
             return ProfileJson.ParseProfile(responseJson);
         }
@@ -97,7 +97,7 @@ namespace BackendSdk
             var responseJson = await client.PostJsonAnonymousAsync(
                 BuildBatchPath(client),
                 body,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken);
 
             return ProfileJson.ParseBatchResult(responseJson);
         }

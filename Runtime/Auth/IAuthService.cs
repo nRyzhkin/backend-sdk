@@ -11,9 +11,6 @@ namespace BackendSdk
         /// <summary>
         /// Gets the current player session, if one exists.
         /// </summary>
-        /// <remarks>
-        /// The session is read-only. Only the SDK can create or replace the current session.
-        /// </remarks>
         PlayerSession Session { get; }
 
         /// <summary>
@@ -23,27 +20,41 @@ namespace BackendSdk
 
         /// <summary>
         /// Logs in using development-mode credentials configured in Project Settings.
+        /// Editor-only when development mode is enabled.
         /// </summary>
-        /// <remarks>
-        /// This overload is only available when development mode is enabled and the application is running in the Unity Editor.
-        /// </remarks>
-        /// <param name="cancellationToken">A cancellation token for the login operation.</param>
-        /// <returns>A task that completes with the login result.</returns>
         Task<LoginResult> LoginAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Logs in using the specified provider credentials.
+        /// Logs in using provider credentials. Guest logins restore an existing server-issued guest
+        /// and do not create accounts — use <see cref="CreateGuestAsync"/> for that.
         /// </summary>
-        /// <param name="request">The login credentials.</param>
-        /// <param name="cancellationToken">A cancellation token for the login operation.</param>
-        /// <returns>A task that completes with the login result.</returns>
         Task<LoginResult> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Logs out the current player and clears the active local session.
+        /// Creates a server-issued guest account and persists the guest key locally.
         /// </summary>
-        /// <param name="cancellationToken">A cancellation token for the logout operation.</param>
-        /// <returns>A task that completes when logout finishes.</returns>
+        Task<LoginResult> CreateGuestAsync(CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Logs in as an existing player by public user id. Requires Auth:AllowPublicIdLogin on the server.
+        /// </summary>
+        Task<LoginResult> LoginByUserIdAsync(string userId, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Links a platform identity to the authenticated player (typically after guest play).
+        /// </summary>
+        Task<LoginResult> LinkAsync(LoginRequest request, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Restores or creates a session: stored guest, new guest, and optional platform link/login.
+        /// </summary>
+        Task<LoginResult> EnsureSessionAsync(
+            LoginRequest platform = null,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Clears the local session. Does not delete the stored guest key.
+        /// </summary>
         Task LogoutAsync(CancellationToken cancellationToken = default);
     }
 }

@@ -25,7 +25,7 @@ namespace BackendSdk
             ValidateKey(key);
 
             var applicationId = client.ApplicationIdOrThrow();
-            var responseJson = await client.GetRawAsync(BuildEntryPath(client, key), cancellationToken).ConfigureAwait(false);
+            var responseJson = await client.GetRawAsync(BuildEntryPath(client, key), cancellationToken);
             var valueJson = RemoteConfigJson.ExtractValueJson(responseJson, applicationId, key);
             return new RemoteConfigValue(valueJson);
         }
@@ -35,7 +35,7 @@ namespace BackendSdk
             string key,
             CancellationToken cancellationToken = default)
         {
-            var value = await GetAsync(key, cancellationToken).ConfigureAwait(false);
+            var value = await GetAsync(key, cancellationToken);
             return RemoteConfigJson.DeserializeValue<T>(value.RawJson, Backend.Settings.ApplicationId, key);
         }
 
@@ -47,7 +47,7 @@ namespace BackendSdk
             cancellationToken.ThrowIfCancellationRequested();
 
             var applicationId = client.ApplicationIdOrThrow();
-            var responseJson = await client.GetRawAsync(BuildAllPath(client), cancellationToken).ConfigureAwait(false);
+            var responseJson = await client.GetRawAsync(BuildAllPath(client), cancellationToken);
             return RemoteConfigJson.ParseAll(responseJson, applicationId);
         }
 

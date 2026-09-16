@@ -93,7 +93,7 @@ namespace BackendSdk
         /// <returns>A task that completes when initialization finishes.</returns>
         public static async Task InitializeAsync(BackendOptions options, CancellationToken cancellationToken = default)
         {
-            await InitializeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            await InitializeGate.WaitAsync(cancellationToken);
 
             try
             {
@@ -116,7 +116,7 @@ namespace BackendSdk
                 var transport = new UnityWebRequestTransport(Settings);
                 client = new BackendClient(Settings, transport);
 
-                await client.InitializeAsync(cancellationToken).ConfigureAwait(false);
+                await client.InitializeAsync(cancellationToken);
             }
             finally
             {
@@ -139,7 +139,7 @@ namespace BackendSdk
             IBackendTransport transport,
             CancellationToken cancellationToken = default)
         {
-            await InitializeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            await InitializeGate.WaitAsync(cancellationToken);
 
             try
             {
@@ -148,7 +148,7 @@ namespace BackendSdk
                 Settings = BackendSettings.FromOptions(resolvedOptions);
                 TransportRequestBuilder.BodySerializer = UnityTransportBodySerializer.Instance;
                 client = new BackendClient(Settings, transport);
-                await client.InitializeAsync(cancellationToken).ConfigureAwait(false);
+                await client.InitializeAsync(cancellationToken);
             }
             finally
             {
@@ -162,6 +162,8 @@ namespace BackendSdk
             Settings = null;
             Economy.ClearCache();
             Auth.ClearSession();
+            Auth.GuestCredentials = new PlayerPrefsGuestCredentialStore();
+            Auth.EditorLogin = new PlayerPrefsGuestCredentialStore(PlayerPrefsGuestCredentialStore.EditorLoginPrefix);
             UnityWebRequestTransport.TestSendOnceHandler = null;
         }
     }

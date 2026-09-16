@@ -120,6 +120,51 @@ namespace BackendSdk.DotNetTests
     }
 
     [Test]
+    public void AuthCreateGuestAsync_SendsRequestIdWithoutAuthorization()
+    {
+      var body = new JsonRequestBody("{}");
+      var snapshot = BuildWrite(
+          HttpVerb.Post,
+          "v1/auth/guest",
+          body,
+          authorized: false);
+
+      Assert.AreEqual(TransportHttpMethods.Post, snapshot.Method);
+      TransportHeaderAssertions.AssertRequestId(snapshot);
+      TransportHeaderAssertions.AssertAuthorizationAbsent(snapshot);
+    }
+
+    [Test]
+    public void AuthLinkAsync_SendsRequestIdWithAuthorization()
+    {
+      var body = new JsonRequestBody("{\"provider\":\"steam\",\"externalId\":\"s1\"}");
+      var snapshot = BuildWrite(
+          HttpVerb.Post,
+          "v1/auth/link",
+          body,
+          authorized: true);
+
+      Assert.AreEqual(TransportHttpMethods.Post, snapshot.Method);
+      TransportHeaderAssertions.AssertRequestId(snapshot);
+      TransportHeaderAssertions.AssertAuthorizationPresent(snapshot);
+    }
+
+    [Test]
+    public void AuthImpersonateAsync_SendsRequestIdWithoutAuthorization()
+    {
+      var body = new JsonRequestBody("{\"userId\":\"3fa85f64-5717-4562-b3fc-2c963f66afa6\"}");
+      var snapshot = BuildWrite(
+          HttpVerb.Post,
+          "v1/auth/impersonate",
+          body,
+          authorized: false);
+
+      Assert.AreEqual(TransportHttpMethods.Post, snapshot.Method);
+      TransportHeaderAssertions.AssertRequestId(snapshot);
+      TransportHeaderAssertions.AssertAuthorizationAbsent(snapshot);
+    }
+
+    [Test]
     public void ProfilesBatch_DoesNotSendRequestId()
     {
       var body = new ReadOnlyJsonRequestBody("{\"userIds\":[\"3fa85f64-5717-4562-b3fc-2c963f66afa6\"]}");

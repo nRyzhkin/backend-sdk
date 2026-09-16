@@ -15,6 +15,54 @@ namespace UnityEngine
         public static bool isEditor => true;
     }
 
+    public static class PlayerPrefs
+    {
+        static readonly System.Collections.Generic.Dictionary<string, string> Values =
+            new System.Collections.Generic.Dictionary<string, string>(StringComparer.Ordinal);
+
+        public static bool HasKey(string key)
+        {
+            return !string.IsNullOrEmpty(key) && Values.ContainsKey(key);
+        }
+
+        public static string GetString(string key, string defaultValue = "")
+        {
+            if (!string.IsNullOrEmpty(key) && Values.TryGetValue(key, out var value))
+            {
+                return value;
+            }
+
+            return defaultValue ?? string.Empty;
+        }
+
+        public static void SetString(string key, string value)
+        {
+            if (string.IsNullOrEmpty(key))
+            {
+                return;
+            }
+
+            Values[key] = value ?? string.Empty;
+        }
+
+        public static void DeleteKey(string key)
+        {
+            if (!string.IsNullOrEmpty(key))
+            {
+                Values.Remove(key);
+            }
+        }
+
+        public static void Save()
+        {
+        }
+
+        public static void DeleteAll()
+        {
+            Values.Clear();
+        }
+    }
+
     public static class JsonUtility
     {
         public static string ToJson(object value)

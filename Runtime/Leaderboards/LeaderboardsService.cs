@@ -33,7 +33,7 @@ namespace BackendSdk
             var response = await client.PutAsync<LeaderboardSubmitRequestDto, LeaderboardSubmitResponseDto>(
                 BuildPath(client, leaderboardName),
                 body,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken);
 
             return new LeaderboardSubmitResult(response?.value ?? value, response?.rank ?? 0);
         }
@@ -55,7 +55,7 @@ namespace BackendSdk
 
             var client = Backend.ClientOrThrow();
             var path = $"{BuildPath(client, leaderboardName)}?limit={limit}";
-            var response = await client.GetAsync<LeaderboardTopResponseDto>(path, cancellationToken).ConfigureAwait(false);
+            var response = await client.GetAsync<LeaderboardTopResponseDto>(path, cancellationToken);
 
             return MapEntries(response?.entries);
         }
@@ -80,7 +80,7 @@ namespace BackendSdk
             }
 
             var path = $"{BuildPath(client, leaderboardName)}/me?range={range}";
-            var response = await client.GetAsync<LeaderboardAroundResponseDto>(path, cancellationToken).ConfigureAwait(false);
+            var response = await client.GetAsync<LeaderboardAroundResponseDto>(path, cancellationToken);
 
             if (response?.me == null)
             {

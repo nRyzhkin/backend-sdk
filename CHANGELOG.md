@@ -4,6 +4,23 @@ All notable changes to this package will be documented in this file.
 
 The format is based on Keep a Changelog, and this package follows Semantic Versioning.
 
+## [0.7.0] - 2026-09-16
+
+### Added
+
+- `Auth.CreateGuestAsync`, `Auth.LinkAsync`, and `Auth.EnsureSessionAsync` for server-issued guest accounts and platform linking.
+- `IGuestCredentialStore` with PlayerPrefs default (`BackendSdk.GuestKey.{applicationId}`).
+- `AuthProviders.Guest` and `LoginResult.GuestKey`.
+- `PlayerProfile.PublicDataJson` is now public for round-trip profile updates.
+- `Auth.LoginByUserIdAsync` and `POST /v1/auth/impersonate` for Editor login by public player id (server flag `Auth:AllowPublicIdLogin`).
+- Project Settings → Backend **Editor Account** field (this machine only).
+
+### Changed
+
+- Guest login never creates a user; unknown guest keys fail until `POST /v1/auth/guest`.
+- Login and guest create are sent without a previous Authorization header.
+- Runtime awaits no longer use `ConfigureAwait(false)` so continuations stay on the Unity/WebGL main thread.
+
 ## [0.6.1] - 2026-07-22
 
 ### Changed
