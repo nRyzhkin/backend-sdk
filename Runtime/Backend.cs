@@ -65,6 +65,11 @@ namespace BackendSdk
         public static JobsService Jobs { get; } = new JobsService();
 
         /// <summary>
+        /// Gets the community tracks catalog service facade.
+        /// </summary>
+        public static CommunityTracksService CommunityTracks { get; } = new CommunityTracksService();
+
+        /// <summary>
         /// Gets a value indicating whether the SDK has been initialized.
         /// </summary>
         public static bool IsInitialized => client != null;

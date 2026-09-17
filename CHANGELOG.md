@@ -4,6 +4,12 @@ All notable changes to this package will be documented in this file.
 
 The format is based on Keep a Changelog, and this package follows Semantic Versioning.
 
+## [0.8.0] - 2026-09-17
+
+### Added
+
+- `Backend.CommunityTracks` public UGC catalog: `ListFeedAsync`, `PublishAsync`, `GetPackageAsync` against `v1/community-tracks/{applicationId}`.
+
 ## [0.7.0] - 2026-09-16
 
 ### Added
