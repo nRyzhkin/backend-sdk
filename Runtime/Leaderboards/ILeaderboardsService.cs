@@ -23,13 +23,13 @@ namespace BackendSdk
             CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// Gets the top entries for a leaderboard.
+        /// Gets the top entries for a leaderboard (and the caller's entry when authenticated).
         /// </summary>
         /// <param name="leaderboardName">The leaderboard name.</param>
         /// <param name="limit">The maximum number of entries to return.</param>
         /// <param name="cancellationToken">A cancellation token for the operation.</param>
-        /// <returns>A task that completes with the top entries.</returns>
-        Task<LeaderboardEntry[]> GetTopAsync(
+        /// <returns>A task that completes with the top page and optional me entry.</returns>
+        Task<LeaderboardTopResult> GetTopAsync(
             string leaderboardName,
             int limit = 100,
             CancellationToken cancellationToken = default);

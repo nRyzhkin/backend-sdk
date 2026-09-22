@@ -29,6 +29,7 @@ public static class GameBootstrap
 
         await Backend.Leaderboards.SubmitAsync("highscore", 1000, SortMode.Descending);
         var top = await Backend.Leaderboards.GetTopAsync("highscore");
+        // top.Entries — page of ranks; top.Me — your entry when signed in (even outside the page)
 
         await Backend.Analytics.TrackAsync(
             "LevelStarted",

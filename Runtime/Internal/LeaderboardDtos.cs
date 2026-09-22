@@ -28,6 +28,7 @@ namespace BackendSdk.Internal
     internal sealed class LeaderboardTopResponseDto
     {
         public LeaderboardEntryDto[] entries = Array.Empty<LeaderboardEntryDto>();
+        public LeaderboardEntryDto me;
     }
 
     [Serializable]

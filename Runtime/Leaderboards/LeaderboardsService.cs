@@ -39,7 +39,7 @@ namespace BackendSdk
         }
 
         /// <inheritdoc />
-        public async Task<LeaderboardEntry[]> GetTopAsync(
+        public async Task<LeaderboardTopResult> GetTopAsync(
             string leaderboardName,
             int limit = 100,
             CancellationToken cancellationToken = default)
@@ -57,7 +57,13 @@ namespace BackendSdk
             var path = $"{BuildPath(client, leaderboardName)}?limit={limit}";
             var response = await client.GetAsync<LeaderboardTopResponseDto>(path, cancellationToken);
 
-            return MapEntries(response?.entries);
+            LeaderboardEntry me = null;
+            if (response?.me != null && !string.IsNullOrEmpty(response.me.userId))
+            {
+                me = MapEntry(response.me);
+            }
+
+            return new LeaderboardTopResult(MapEntries(response?.entries), me);
         }
 
         /// <inheritdoc />
