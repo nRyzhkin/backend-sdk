@@ -105,6 +105,19 @@ namespace BackendSdk
         }
 
         /// <inheritdoc />
+        public async Task DeleteAsync(
+            string trackId,
+            CancellationToken cancellationToken = default)
+        {
+            var client = GetAuthenticatedClient();
+            cancellationToken.ThrowIfCancellationRequested();
+            ValidateTrackId(trackId);
+
+            var path = BuildTrackPath(client, trackId);
+            await client.DeleteAsync(path, cancellationToken);
+        }
+
+        /// <inheritdoc />
         public async Task<byte[]> GetPackageAsync(
             string trackId,
             string contentHash,

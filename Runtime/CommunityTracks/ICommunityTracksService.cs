@@ -30,6 +30,13 @@ namespace BackendSdk
             CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Deletes the authenticated player's own publication from the catalog (idempotent).
+        /// </summary>
+        Task DeleteAsync(
+            string trackId,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Downloads a published package by track id + content hash (anonymous).
         /// </summary>
         Task<byte[]> GetPackageAsync(
