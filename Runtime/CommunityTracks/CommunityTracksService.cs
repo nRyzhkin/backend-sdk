@@ -14,8 +14,9 @@ namespace BackendSdk
     public sealed class CommunityTracksService : ICommunityTracksService
     {
         /// <inheritdoc />
-        public async Task<CommunityTrackInfo[]> ListFeedAsync(
-            int limit = 100,
+        public async Task<CommunityTrackFeedPage> ListFeedAsync(
+            int limit = 18,
+            string cursor = null,
             CancellationToken cancellationToken = default)
         {
             EnsureInitialized();
@@ -32,8 +33,13 @@ namespace BackendSdk
 
             var client = Backend.ClientOrThrow();
             var path = $"{BuildFeedPath(client)}?limit={limit}";
+            if (!string.IsNullOrEmpty(cursor))
+                path += "&cursor=" + Uri.EscapeDataString(cursor);
+
             var response = await client.GetAsync<CommunityTrackFeedDto>(path, cancellationToken);
-            return MapItems(response?.items);
+            return new CommunityTrackFeedPage(
+                MapItems(response?.items),
+                response?.nextCursor ?? string.Empty);
         }
 
         /// <inheritdoc />

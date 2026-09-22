@@ -4,6 +4,12 @@ All notable changes to this package will be documented in this file.
 
 The format is based on Keep a Changelog, and this package follows Semantic Versioning.
 
+## [0.11.0] - 2026-09-22
+
+### Changed
+
+- `Backend.CommunityTracks.ListFeedAsync` returns `CommunityTrackFeedPage` with `NextCursor` and accepts `cursor` for ranked pagination (default limit 18).
+
 ## [0.10.0] - 2026-09-22
 
 ### Added

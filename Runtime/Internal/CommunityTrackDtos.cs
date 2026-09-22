@@ -24,6 +24,7 @@ namespace BackendSdk.Internal
     internal sealed class CommunityTrackFeedDto
     {
         public CommunityTrackItemDto[] items = Array.Empty<CommunityTrackItemDto>();
+        public string nextCursor = string.Empty;
     }
 
     [Serializable]

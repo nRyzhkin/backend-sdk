@@ -11,8 +11,9 @@ namespace BackendSdk
         /// <summary>
         /// Lists published community tracks for the configured application (anonymous).
         /// </summary>
-        Task<CommunityTrackInfo[]> ListFeedAsync(
-            int limit = 100,
+        Task<CommunityTrackFeedPage> ListFeedAsync(
+            int limit = 18,
+            string cursor = null,
             CancellationToken cancellationToken = default);
 
         /// <summary>
