@@ -15,12 +15,31 @@ namespace BackendSdk.Internal
         public string previewPngBase64 = string.Empty;
         public string publishedAtUtc = string.Empty;
         public int packageByteLength;
+        public int likeCount;
+        public int visitorCount;
+        public bool likedByMe;
     }
 
     [Serializable]
     internal sealed class CommunityTrackFeedDto
     {
         public CommunityTrackItemDto[] items = Array.Empty<CommunityTrackItemDto>();
+    }
+
+    [Serializable]
+    internal sealed class CommunityTrackEngagementDto
+    {
+        public string trackId = string.Empty;
+        public int likeCount;
+        public int visitorCount;
+        public bool likedByMe;
+        public bool hidden;
+    }
+
+    [Serializable]
+    internal sealed class CommunityTrackReportRequestDto
+    {
+        public string reason = string.Empty;
     }
 
     [Serializable]
@@ -42,5 +61,47 @@ namespace BackendSdk.Internal
         public string contentHash = string.Empty;
         public string packageBase64 = string.Empty;
         public int packageByteLength;
+    }
+
+    [Serializable]
+    internal sealed class CommunityTrackGhostPutRequestDto
+    {
+        public string contentHash = string.Empty;
+        public double timeSeconds;
+        public string ghostBase64 = string.Empty;
+        public string transportHash = string.Empty;
+        public string transportName = string.Empty;
+    }
+
+    [Serializable]
+    internal sealed class CommunityTrackGhostItemDto
+    {
+        public string trackId = string.Empty;
+        public string contentHash = string.Empty;
+        public string userId = string.Empty;
+        public double timeSeconds;
+        public string transportHash = string.Empty;
+        public string transportName = string.Empty;
+        public int ghostByteLength;
+        public bool hasGhost = true;
+    }
+
+    [Serializable]
+    internal sealed class CommunityTrackGhostListDto
+    {
+        public CommunityTrackGhostItemDto[] items = Array.Empty<CommunityTrackGhostItemDto>();
+    }
+
+    [Serializable]
+    internal sealed class CommunityTrackGhostPackageDto
+    {
+        public string trackId = string.Empty;
+        public string contentHash = string.Empty;
+        public string userId = string.Empty;
+        public double timeSeconds;
+        public string transportHash = string.Empty;
+        public string transportName = string.Empty;
+        public string ghostBase64 = string.Empty;
+        public int ghostByteLength;
     }
 }

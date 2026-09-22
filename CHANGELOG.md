@@ -4,6 +4,12 @@ All notable changes to this package will be documented in this file.
 
 The format is based on Keep a Changelog, and this package follows Semantic Versioning.
 
+## [0.9.0] - 2026-09-17
+
+### Added
+
+- `Backend.CommunityTracks` ghost APIs: `PutGhostAsync`, `ListGhostsAsync`, `GetGhostAsync` against `v1/community-tracks/{applicationId}/{trackId}/ghosts`.
+
 ## [0.8.0] - 2026-09-17
 
 ### Added

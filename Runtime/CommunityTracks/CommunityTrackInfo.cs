@@ -15,7 +15,10 @@ namespace BackendSdk
             string requiredTransportName,
             string previewPngBase64,
             string publishedAtUtc,
-            int packageByteLength)
+            int packageByteLength,
+            int likeCount = 0,
+            int visitorCount = 0,
+            bool likedByMe = false)
         {
             TrackId = trackId ?? string.Empty;
             ContentHash = contentHash ?? string.Empty;
@@ -27,6 +30,9 @@ namespace BackendSdk
             PreviewPngBase64 = previewPngBase64 ?? string.Empty;
             PublishedAtUtc = publishedAtUtc ?? string.Empty;
             PackageByteLength = packageByteLength;
+            LikeCount = likeCount < 0 ? 0 : likeCount;
+            VisitorCount = visitorCount < 0 ? 0 : visitorCount;
+            LikedByMe = likedByMe;
         }
 
         public string TrackId { get; }
@@ -39,5 +45,8 @@ namespace BackendSdk
         public string PreviewPngBase64 { get; }
         public string PublishedAtUtc { get; }
         public int PackageByteLength { get; }
+        public int LikeCount { get; }
+        public int VisitorCount { get; }
+        public bool LikedByMe { get; }
     }
 }

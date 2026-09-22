@@ -74,6 +74,16 @@ namespace BackendSdk.Internal
                 cancellationToken);
         }
 
+        internal Task<TResponse> DeleteAsync<TResponse>(string path, CancellationToken cancellationToken = default)
+        {
+            return transport.SendAsync<object, TResponse>(
+                HttpVerb.Delete,
+                path,
+                null,
+                ResolveAuthorizationHeader(),
+                cancellationToken);
+        }
+
         internal Task PostJsonAsync(string path, string jsonBody, CancellationToken cancellationToken = default)
         {
             return transport.SendAsync<JsonRequestBody, EmptyResponse>(
