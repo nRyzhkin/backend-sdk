@@ -18,6 +18,9 @@ namespace BackendSdk.Internal
         public int likeCount;
         public int visitorCount;
         public bool likedByMe;
+        public bool hidden;
+        public string moderationStatus = string.Empty;
+        public int reportCount;
     }
 
     [Serializable]
@@ -41,6 +44,32 @@ namespace BackendSdk.Internal
     internal sealed class CommunityTrackReportRequestDto
     {
         public string reason = string.Empty;
+    }
+
+    [Serializable]
+    internal sealed class CommunityTrackModerationHideRequestDto
+    {
+        public string reason = string.Empty;
+    }
+
+    [Serializable]
+    internal sealed class CommunityTrackModerationReportDto
+    {
+        public string userPublicId = string.Empty;
+        public string reason = string.Empty;
+        public string createdAt = string.Empty;
+        public string updatedAt = string.Empty;
+    }
+
+    [Serializable]
+    internal sealed class CommunityTrackModerationDto
+    {
+        public string trackId = string.Empty;
+        public string title = string.Empty;
+        public string moderationStatus = string.Empty;
+        public string hiddenReason = string.Empty;
+        public int reportCount;
+        public CommunityTrackModerationReportDto[] reports = Array.Empty<CommunityTrackModerationReportDto>();
     }
 
     [Serializable]

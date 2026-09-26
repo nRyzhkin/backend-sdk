@@ -14,6 +14,7 @@ namespace BackendSdk
         Task<CommunityTrackFeedPage> ListFeedAsync(
             int limit = 18,
             string cursor = null,
+            bool includeHidden = false,
             CancellationToken cancellationToken = default);
 
         /// <summary>
@@ -23,6 +24,7 @@ namespace BackendSdk
             string query,
             int limit = 18,
             string cursor = null,
+            bool includeHidden = false,
             CancellationToken cancellationToken = default);
 
         /// <summary>
@@ -73,6 +75,22 @@ namespace BackendSdk
         Task<CommunityTrackEngagement> ReportAsync(
             string trackId,
             CommunityTrackReportReason reason,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>Loads moderation details (reports + status) for a community track. Requires moderator.</summary>
+        Task<CommunityTrackModeration> GetModerationAsync(
+            string trackId,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>Hides a community track from the public feed. Requires moderator.</summary>
+        Task<CommunityTrackModeration> HideAsModeratorAsync(
+            string trackId,
+            string reason = null,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>Restores a hidden community track to the public feed. Requires moderator.</summary>
+        Task<CommunityTrackModeration> UnhideAsModeratorAsync(
+            string trackId,
             CancellationToken cancellationToken = default);
 
         /// <summary>

@@ -53,6 +53,7 @@ namespace BackendSdk.Internal
             var publicDataJson = ParsePublicDataJson(trimmed);
             var createdAt = ParseUtcDateTime(createdAtJson, "createdAt");
             var updatedAt = ParseUtcDateTime(updatedAtJson, "updatedAt");
+            var isModerator = ParseOptionalBool(trimmed, "isModerator");
 
             return new PlayerProfile(
                 userId,
@@ -61,7 +62,8 @@ namespace BackendSdk.Internal
                 avatarId,
                 publicDataJson,
                 createdAt,
-                updatedAt);
+                updatedAt,
+                isModerator);
         }
 
         internal static PlayerProfileBatchResult ParseBatchResult(string json)
@@ -210,6 +212,28 @@ namespace BackendSdk.Internal
             }
 
             return RemoteConfigJson.ParseJsonString(valueJson);
+        }
+
+        private static bool ParseOptionalBool(string profileJson, string propertyName)
+        {
+            if (!RemoteConfigJson.TryGetObjectProperty(profileJson, propertyName, out var valueJson))
+            {
+                return false;
+            }
+
+            var trimmed = valueJson.Trim();
+            if (string.Equals(trimmed, "true", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (string.Equals(trimmed, "false", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(trimmed, "null", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return false;
         }
 
         private static Guid ParseGuid(string json, string fieldName)

@@ -18,7 +18,10 @@ namespace BackendSdk
             int packageByteLength,
             int likeCount = 0,
             int visitorCount = 0,
-            bool likedByMe = false)
+            bool likedByMe = false,
+            bool hidden = false,
+            string moderationStatus = null,
+            int reportCount = 0)
         {
             TrackId = trackId ?? string.Empty;
             ContentHash = contentHash ?? string.Empty;
@@ -33,6 +36,9 @@ namespace BackendSdk
             LikeCount = likeCount < 0 ? 0 : likeCount;
             VisitorCount = visitorCount < 0 ? 0 : visitorCount;
             LikedByMe = likedByMe;
+            Hidden = hidden;
+            ModerationStatus = moderationStatus ?? string.Empty;
+            ReportCount = reportCount < 0 ? 0 : reportCount;
         }
 
         public string TrackId { get; }
@@ -48,5 +54,8 @@ namespace BackendSdk
         public int LikeCount { get; }
         public int VisitorCount { get; }
         public bool LikedByMe { get; }
+        public bool Hidden { get; }
+        public string ModerationStatus { get; }
+        public int ReportCount { get; }
     }
 }

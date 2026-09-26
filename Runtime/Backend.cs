@@ -35,6 +35,11 @@ namespace BackendSdk
         public static AnalyticsService Analytics { get; } = new AnalyticsService();
 
         /// <summary>
+        /// Gets the client error reporting facade.
+        /// </summary>
+        public static ClientErrorsService Errors { get; } = new ClientErrorsService();
+
+        /// <summary>
         /// Gets the remote config service facade.
         /// </summary>
         public static RemoteConfigService RemoteConfig { get; } = new RemoteConfigService();

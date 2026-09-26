@@ -17,6 +17,7 @@ namespace BackendSdk
         public async Task<CommunityTrackFeedPage> ListFeedAsync(
             int limit = 18,
             string cursor = null,
+            bool includeHidden = false,
             CancellationToken cancellationToken = default)
         {
             EnsureInitialized();
@@ -35,6 +36,8 @@ namespace BackendSdk
             var path = $"{BuildFeedPath(client)}?limit={limit}";
             if (!string.IsNullOrEmpty(cursor))
                 path += "&cursor=" + Uri.EscapeDataString(cursor);
+            if (includeHidden)
+                path += "&includeHidden=true";
 
             var response = await client.GetAsync<CommunityTrackFeedDto>(path, cancellationToken);
             return new CommunityTrackFeedPage(
@@ -47,6 +50,7 @@ namespace BackendSdk
             string query,
             int limit = 18,
             string cursor = null,
+            bool includeHidden = false,
             CancellationToken cancellationToken = default)
         {
             EnsureInitialized();
@@ -61,6 +65,8 @@ namespace BackendSdk
             var path = $"{BuildFeedPath(client)}/search?limit={limit}&q={Uri.EscapeDataString(query ?? string.Empty)}";
             if (!string.IsNullOrEmpty(cursor))
                 path += "&cursor=" + Uri.EscapeDataString(cursor);
+            if (includeHidden)
+                path += "&includeHidden=true";
 
             var response = await client.GetAsync<CommunityTrackFeedDto>(path, cancellationToken);
             return new CommunityTrackFeedPage(
@@ -253,6 +259,56 @@ namespace BackendSdk
         }
 
         /// <inheritdoc />
+        public async Task<CommunityTrackModeration> GetModerationAsync(
+            string trackId,
+            CancellationToken cancellationToken = default)
+        {
+            var client = GetAuthenticatedClient();
+            cancellationToken.ThrowIfCancellationRequested();
+            ValidateTrackId(trackId);
+
+            var path = $"{BuildTrackPath(client, trackId)}/moderation";
+            var response = await client.GetAsync<CommunityTrackModerationDto>(path, cancellationToken);
+            return MapModeration(response);
+        }
+
+        /// <inheritdoc />
+        public async Task<CommunityTrackModeration> HideAsModeratorAsync(
+            string trackId,
+            string reason = null,
+            CancellationToken cancellationToken = default)
+        {
+            var client = GetAuthenticatedClient();
+            cancellationToken.ThrowIfCancellationRequested();
+            ValidateTrackId(trackId);
+
+            var path = $"{BuildTrackPath(client, trackId)}/moderation/hide";
+            var body = new CommunityTrackModerationHideRequestDto { reason = reason ?? string.Empty };
+            var response = await client.PostAsync<CommunityTrackModerationHideRequestDto, CommunityTrackModerationDto>(
+                path,
+                body,
+                cancellationToken);
+            return MapModeration(response);
+        }
+
+        /// <inheritdoc />
+        public async Task<CommunityTrackModeration> UnhideAsModeratorAsync(
+            string trackId,
+            CancellationToken cancellationToken = default)
+        {
+            var client = GetAuthenticatedClient();
+            cancellationToken.ThrowIfCancellationRequested();
+            ValidateTrackId(trackId);
+
+            var path = $"{BuildTrackPath(client, trackId)}/moderation/unhide";
+            var response = await client.PostAsync<object, CommunityTrackModerationDto>(
+                path,
+                new object(),
+                cancellationToken);
+            return MapModeration(response);
+        }
+
+        /// <inheritdoc />
         public async Task<CommunityTrackGhostInfo> PutGhostAsync(
             CommunityTrackGhostPutRequest request,
             CancellationToken cancellationToken = default)
@@ -440,7 +496,10 @@ namespace BackendSdk
                 item.packageByteLength,
                 item.likeCount,
                 item.visitorCount,
-                item.likedByMe);
+                item.likedByMe,
+                item.hidden,
+                item.moderationStatus,
+                item.reportCount);
         }
 
         static CommunityTrackEngagement MapEngagement(CommunityTrackEngagementDto item)
@@ -456,6 +515,67 @@ namespace BackendSdk
                 item.visitorCount,
                 item.likedByMe,
                 item.hidden);
+        }
+
+        static CommunityTrackModeration MapModeration(CommunityTrackModerationDto item)
+        {
+            if (item == null)
+            {
+                return new CommunityTrackModeration(
+                    string.Empty,
+                    string.Empty,
+                    string.Empty,
+                    string.Empty,
+                    0,
+                    Array.Empty<CommunityTrackModerationReport>());
+            }
+
+            var reports = item.reports;
+            CommunityTrackModerationReport[] mapped;
+            if (reports == null || reports.Length == 0)
+            {
+                mapped = Array.Empty<CommunityTrackModerationReport>();
+            }
+            else
+            {
+                mapped = new CommunityTrackModerationReport[reports.Length];
+                for (var i = 0; i < reports.Length; i++)
+                {
+                    var row = reports[i];
+                    DateTime createdAt = default;
+                    DateTime updatedAt = default;
+                    if (!string.IsNullOrEmpty(row?.createdAt))
+                        DateTime.TryParse(
+                            row.createdAt,
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            System.Globalization.DateTimeStyles.RoundtripKind,
+                            out createdAt);
+                    if (!string.IsNullOrEmpty(row?.updatedAt))
+                        DateTime.TryParse(
+                            row.updatedAt,
+                            System.Globalization.CultureInfo.InvariantCulture,
+                            System.Globalization.DateTimeStyles.RoundtripKind,
+                            out updatedAt);
+
+                    mapped[i] = new CommunityTrackModerationReport(
+                        row?.userPublicId ?? string.Empty,
+                        row?.reason ?? string.Empty,
+                        createdAt.Kind == DateTimeKind.Unspecified
+                            ? DateTime.SpecifyKind(createdAt, DateTimeKind.Utc)
+                            : createdAt.ToUniversalTime(),
+                        updatedAt.Kind == DateTimeKind.Unspecified
+                            ? DateTime.SpecifyKind(updatedAt, DateTimeKind.Utc)
+                            : updatedAt.ToUniversalTime());
+                }
+            }
+
+            return new CommunityTrackModeration(
+                item.trackId,
+                item.title,
+                item.moderationStatus,
+                item.hiddenReason,
+                item.reportCount,
+                mapped);
         }
 
         static CommunityTrackGhostInfo[] MapGhostItems(CommunityTrackGhostItemDto[] items)

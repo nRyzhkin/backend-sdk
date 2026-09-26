@@ -15,7 +15,8 @@ namespace BackendSdk
             string avatarId,
             string publicDataJson,
             DateTime createdAt,
-            DateTime updatedAt)
+            DateTime updatedAt,
+            bool isModerator = false)
         {
             UserId = userId;
             ApplicationId = applicationId ?? string.Empty;
@@ -24,6 +25,7 @@ namespace BackendSdk
             PublicDataJson = publicDataJson ?? "{}";
             CreatedAt = createdAt;
             UpdatedAt = updatedAt;
+            IsModerator = isModerator;
         }
 
         /// <summary>
@@ -60,6 +62,11 @@ namespace BackendSdk
         /// Gets when the profile was last updated (UTC).
         /// </summary>
         public DateTime UpdatedAt { get; }
+
+        /// <summary>
+        /// True when this player may moderate community tracks for the application (own profile only).
+        /// </summary>
+        public bool IsModerator { get; }
 
         /// <summary>
         /// Deserializes the client-controlled public data payload to the requested type.
