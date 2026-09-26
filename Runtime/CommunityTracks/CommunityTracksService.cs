@@ -43,6 +43,32 @@ namespace BackendSdk
         }
 
         /// <inheritdoc />
+        public async Task<CommunityTrackFeedPage> SearchAsync(
+            string query,
+            int limit = 18,
+            string cursor = null,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureInitialized();
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (limit < 1)
+                limit = 1;
+            else if (limit > 50)
+                limit = 50;
+
+            var client = Backend.ClientOrThrow();
+            var path = $"{BuildFeedPath(client)}/search?limit={limit}&q={Uri.EscapeDataString(query ?? string.Empty)}";
+            if (!string.IsNullOrEmpty(cursor))
+                path += "&cursor=" + Uri.EscapeDataString(cursor);
+
+            var response = await client.GetAsync<CommunityTrackFeedDto>(path, cancellationToken);
+            return new CommunityTrackFeedPage(
+                MapItems(response?.items),
+                response?.nextCursor ?? string.Empty);
+        }
+
+        /// <inheritdoc />
         public async Task<CommunityTrackInfo[]> ListLikedAsync(
             int limit = 100,
             CancellationToken cancellationToken = default)

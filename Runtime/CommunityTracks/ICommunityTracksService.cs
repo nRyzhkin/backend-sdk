@@ -17,6 +17,15 @@ namespace BackendSdk
             CancellationToken cancellationToken = default);
 
         /// <summary>
+        /// Ranked search across the public catalog (title, author, fuzzy, layout).
+        /// </summary>
+        Task<CommunityTrackFeedPage> SearchAsync(
+            string query,
+            int limit = 18,
+            string cursor = null,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
         /// Lists tracks the authenticated player has liked (visible only).
         /// </summary>
         Task<CommunityTrackInfo[]> ListLikedAsync(

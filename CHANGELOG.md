@@ -4,6 +4,12 @@ All notable changes to this package will be documented in this file.
 
 The format is based on Keep a Changelog, and this package follows Semantic Versioning.
 
+## [0.12.0] - 2026-09-22
+
+### Added
+
+- `Backend.CommunityTracks.SearchAsync` — ranked catalog search (`GET …/search?q=`) with title/author relevance, typo tolerance, and EN↔RU layout variants.
+
 ## [0.11.0] - 2026-09-22
 
 ### Changed
