@@ -100,8 +100,9 @@ namespace BackendSdk.Editor
 
                 rootElement.Add(new HelpBox(
                     "Editor Account is the only local Editor login: UserSettings/BackendSdkEditorAccount.json. " +
-                    "The server remains the source of truth for the player. Empty + Play creates a guest and writes the public player id here. " +
-                    "Paste a public player GUID to impersonate (Auth:AllowPublicIdLogin, on in Development). Clear the field for a new guest.",
+                    "The server remains the source of truth for the player. Empty + Play creates a guest and writes its guest key here (works on any server). " +
+                    "Paste a guest key to log in as that guest, or a public player GUID to impersonate (Auth:AllowPublicIdLogin, on in Development only). " +
+                    "Clear the field for a new guest.",
                     HelpBoxMessageType.Info));
 
                 var editorStore = new EditorAccountFileStore();

@@ -311,8 +311,9 @@ namespace BackendSdk
 #if UNITY_EDITOR && !BACKEND_SDK_DOTNET
             if (EditorLogin != null)
             {
-                if (!string.IsNullOrWhiteSpace(playerSession.PlayerId))
-                    EditorLogin.Save(applicationId, playerSession.PlayerId);
+                var editorAccount = EditorAccountValue(playerSession);
+                if (!string.IsNullOrWhiteSpace(editorAccount))
+                    EditorLogin.Save(applicationId, editorAccount);
                 GuestCredentials?.Clear(applicationId);
             }
             else
@@ -355,17 +356,37 @@ namespace BackendSdk
             }
 
             raw = raw.Trim();
-            if (Guid.TryParse(raw, out _))
-                await LoginByUserIdAsync(raw, cancellationToken);
-            else
+            var isPlayerId = Guid.TryParse(raw, out _);
+            try
             {
-                await LoginAsync(
-                    new LoginRequest
-                    {
-                        Provider = AuthProviders.Guest,
-                        ExternalId = raw
-                    },
-                    cancellationToken);
+                if (isPlayerId)
+                    await LoginByUserIdAsync(raw, cancellationToken);
+                else
+                {
+                    await LoginAsync(
+                        new LoginRequest
+                        {
+                            Provider = AuthProviders.Guest,
+                            ExternalId = raw
+                        },
+                        cancellationToken);
+                }
+            }
+            catch (BackendException ex) when (ex.StatusCode == 401)
+            {
+                UnityEngine.Debug.LogWarning(
+                    $"Backend SDK: Editor Account '{raw}' is unknown to the server ({ex.Message}). Creating a new guest.");
+                editorStore.Clear(applicationId);
+                GuestCredentials?.Clear(applicationId);
+                return false;
+            }
+            catch (BackendException ex) when (isPlayerId && ex.StatusCode == 404)
+            {
+                UnityEngine.Debug.LogWarning(
+                    $"Backend SDK: server does not allow login by player id (Auth:AllowPublicIdLogin), " +
+                    $"Editor Account '{raw}' cannot be used here. Paste that player's guest key into " +
+                    "Project Settings > Backend SDK > Editor Account to keep it. Creating a new guest.");
+                return false;
             }
 
             GuestCredentials?.Clear(applicationId);
@@ -375,13 +396,23 @@ namespace BackendSdk
 
         void RememberEditorLogin(string applicationId)
         {
-            if (string.IsNullOrWhiteSpace(Session?.PlayerId))
+            var editorAccount = EditorAccountValue(Session);
+            if (string.IsNullOrWhiteSpace(editorAccount))
             {
                 return;
             }
 
             var editorStore = EditorLogin ?? new EditorAccountFileStore();
-            editorStore.Save(applicationId, Session.PlayerId);
+            editorStore.Save(applicationId, editorAccount);
+        }
+
+        /// <summary>
+        /// Guest key for guest sessions (works on any server), public player id otherwise
+        /// (needs Auth:AllowPublicIdLogin to log back in).
+        /// </summary>
+        static string EditorAccountValue(PlayerSession playerSession)
+        {
+            return GuestKeyFromSession(playerSession) ?? playerSession?.PlayerId;
         }
 #endif
 
